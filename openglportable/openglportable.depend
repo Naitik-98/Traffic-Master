@@ -51,3 +51,27 @@
 	<GL/glu.h>
 	<stdlib.h>
 
+1786725942 source:g:\github\projects\traffic-master\openglportable\main.cpp
+	<GL/glut.h>
+	<vector>
+	<algorithm>
+	<cstdio>
+	<cmath>
+	<cstdlib>
+	<cstring>
+	<ctime>
+
+1786691355 g:\github\projects\traffic-master\freeglut\include\gl\glut.h
+	"freeglut_std.h"
+
+1786691355 g:\github\projects\traffic-master\freeglut\include\gl\freeglut_std.h
+	<windows.h>
+	<EGL/egl.h>
+	<GLES/gl.h>
+	<GLES2/gl2.h>
+	<OpenGL/gl.h>
+	<OpenGL/glu.h>
+	<GL/gl.h>
+	<GL/glu.h>
+	<stdlib.h>
+

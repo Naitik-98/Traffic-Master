@@ -14,6 +14,11 @@ void drawHUD();
 void resetSimulation();
 void keyboard(unsigned char key, int x, int y);
 
+// small decorative helpers
+void drawTree(float x, float z);
+void drawGrassPatch(float x, float z);
+void drawSmallBuilding(float sx, float sy, float sz);
+
 int windowWidth = 1280;
 int windowHeight = 720;
 
@@ -305,14 +310,12 @@ void drawBuildings()
         glPopMatrix();
     }
 
-    // South row (z = 32)
+    // South row (z = 32) - bottom area: trees and grass as requested
     for (int i = 0; i < 6; ++i)
     {
-        glPushMatrix();
-        glTranslatef(xs[i], heights[5-i] * 0.5f, 32.0f);
-        glColor3f(0.6f - i*0.03f, 0.5f + i*0.02f, 0.5f - i*0.02f);
-        drawBox(6.0f, heights[5-i], 8.0f);
-        glPopMatrix();
+        float xpos = xs[i];
+        drawGrassPatch(xpos, 32.0f);
+        drawTree(xpos + (i%2 ? -1.2f : 1.2f), 32.0f - 1.5f);
     }
 
     // East column (x = 32)
@@ -340,6 +343,52 @@ void drawBuildings()
 float occupancyNS = 0.0f; // combined north/south occupancy (0..1)
 float occupancyEW = 0.0f; // combined east/west occupancy (0..1)
 int laneCapacity = 1;
+
+void drawTree(float x, float z)
+{
+    // simple conical tree
+    glPushMatrix();
+    glTranslatef(x, 0.0f, z);
+    glColor3f(0.12f, 0.45f, 0.12f);
+    glPushMatrix();
+    glTranslatef(0.0f, 1.2f, 0.0f);
+    glutSolidCone(0.8f, 2.0f, 12, 8);
+    glPopMatrix();
+    glColor3f(0.4f, 0.25f, 0.1f);
+    glPushMatrix();
+    glTranslatef(0.0f, 0.3f, 0.0f);
+    drawBox(0.2f, 0.6f, 0.2f);
+    glPopMatrix();
+    glPopMatrix();
+}
+
+void drawGrassPatch(float x, float z)
+{
+    glPushMatrix();
+    glTranslatef(x, 0.0f, z);
+    glColor3f(0.18f, 0.6f, 0.18f);
+    glBegin(GL_QUADS);
+        glVertex3f(-2.5f, 0.01f, -2.5f);
+        glVertex3f( 2.5f, 0.01f, -2.5f);
+        glVertex3f( 2.5f, 0.01f,  2.5f);
+        glVertex3f(-2.5f, 0.01f,  2.5f);
+    glEnd();
+    glPopMatrix();
+}
+
+void drawSmallBuilding(float sx, float sy, float sz)
+{
+    glPushMatrix();
+    glColor3f(0.6f, 0.6f, 0.65f);
+    drawBox(sx*0.375f, sy, sz*0.416f);
+    glColor3f(0.3f, 0.3f, 0.35f);
+    glPushMatrix();
+    glTranslatef(0.0f, sy*0.3f, sz*0.32f);
+    drawBox(sx*0.125f, sy*0.4f, sz*0.16f);
+    glPopMatrix();
+    glPopMatrix();
+}
+
 
 void computeOccupancy()
 {
