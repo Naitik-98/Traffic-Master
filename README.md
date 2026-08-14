@@ -1,6 +1,5 @@
 # Traffic Master
 
-Small FreeGLUT + legacy OpenGL prototype that simulates a 3D four-way intersection and basic traffic behavior.
 
 
 Controls (runtime):
