@@ -34,6 +34,8 @@ int lastSpawnTime = -1200;
 int nextSpawnDirection = 0;
 bool northSouthGreen = false;
 bool gameOver = false;
+int gameOverTime = 0;
+const int autoRestartSeconds = 5;
 
 void updateTrafficLights(int currentTime)
 {
@@ -356,6 +358,7 @@ void computeOccupancy()
     if ((occupancyNS >= 1.0f || occupancyEW >= 1.0f) && !gameOver)
     {
         gameOver = true;
+        gameOverTime = glutGet(GLUT_ELAPSED_TIME);
     }
 }
 
@@ -423,6 +426,18 @@ void drawHUD()
         glColor3f(1.0f, 1.0f, 1.0f);
         int hx = w / 2 - (int)(7 * strlen(hint));
         drawText2D(hx, gy - 28, hint);
+
+        // show auto-restart countdown if available
+        if (gameOverTime > 0)
+        {
+            int elapsedMs = glutGet(GLUT_ELAPSED_TIME) - gameOverTime;
+            int secsLeft = autoRestartSeconds - (elapsedMs / 1000);
+            if (secsLeft < 0) secsLeft = 0;
+            char tbuf[64];
+            sprintf(tbuf, "Restarting in %d s", secsLeft);
+            int tx = w / 2 - (int)(7 * strlen(tbuf));
+            drawText2D(tx, gy - 56, tbuf);
+        }
     }
 
     glEnable(GL_DEPTH_TEST);
@@ -734,6 +749,12 @@ void idle()
         updateTrafficLights(currentTime);
         updateCars(dt, currentTime);
     }
+    else if (gameOverTime > 0)
+    {
+        int elapsed = currentTime - gameOverTime;
+        if (elapsed >= autoRestartSeconds * 1000)
+            resetSimulation();
+    }
     glutPostRedisplay();
 }
 
@@ -767,6 +788,7 @@ void resetSimulation()
     nextSpawnDirection = 0;
     northSouthGreen = false;
     gameOver = false;
+    gameOverTime = 0;
     occupancyNS = occupancyEW = 0.0f;
 }
 
