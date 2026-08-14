@@ -134,6 +134,69 @@ void drawIntersectionFootprint()
     glEnd();
 }
 
+void drawBox(float sx, float sy, float sz)
+{
+    glPushMatrix();
+    glScalef(sx, sy, sz);
+    glutSolidCube(1.0);
+    glPopMatrix();
+}
+
+void drawTrafficLight(float x, float z, float rotationY, bool verticalFacingGreen)
+{
+    glPushMatrix();
+    glTranslatef(x, 0.0f, z);
+    glRotatef(rotationY, 0.0f, 1.0f, 0.0f);
+
+    glColor3f(0.25f, 0.25f, 0.25f);
+    glPushMatrix();
+    glTranslatef(0.0f, 2.0f, 0.0f);
+    drawBox(0.2f, 4.0f, 0.2f);
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslatef(0.0f, 4.1f, 0.0f);
+    drawBox(0.3f, 0.3f, 0.3f);
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslatef(0.0f, 3.8f, 0.18f);
+    drawBox(0.6f, 0.9f, 0.35f);
+    glPopMatrix();
+
+    float redR = 0.45f, redG = 0.05f, redB = 0.05f;
+    float yellowR = 0.45f, yellowG = 0.35f, yellowB = 0.05f;
+    float greenR = 0.05f, greenG = 0.45f, greenB = 0.05f;
+
+    if (verticalFacingGreen)
+    {
+        redR = 0.8f; redG = 0.1f; redB = 0.1f;
+        greenR = 0.1f; greenG = 0.8f; greenB = 0.1f;
+    }
+
+    glPushMatrix();
+    glTranslatef(0.0f, 4.1f, 0.36f);
+    glColor3f(redR, redG, redB);
+    glutSolidSphere(0.08, 12, 12);
+    glTranslatef(0.0f, -0.22f, 0.0f);
+    glColor3f(yellowR, yellowG, yellowB);
+    glutSolidSphere(0.08, 12, 12);
+    glTranslatef(0.0f, -0.22f, 0.0f);
+    glColor3f(greenR, greenG, greenB);
+    glutSolidSphere(0.08, 12, 12);
+    glPopMatrix();
+
+    glPopMatrix();
+}
+
+void drawTrafficLights()
+{
+    drawTrafficLight(-5.9f, -5.9f, 90.0f, false);
+    drawTrafficLight( 5.9f, -5.9f, 180.0f, true);
+    drawTrafficLight(-5.9f,  5.9f, 0.0f, true);
+    drawTrafficLight( 5.9f,  5.9f, -90.0f, false);
+}
+
 void display()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -150,6 +213,7 @@ void display()
     drawIntersectionFootprint();
     drawLaneMarkings();
     drawStopLines();
+    drawTrafficLights();
 
     glutSwapBuffers();
 }

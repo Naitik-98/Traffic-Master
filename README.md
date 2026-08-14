@@ -56,8 +56,6 @@ g++ -Wall -fexceptions -g main.cpp -I ..\freeglut\include -L ..\freeglut\lib\x64
 Controls will be added as the simulation grows.
 
 Planned controls include:
-- `W/A/S/D` - camera movement
-- Arrow keys - camera rotation
 - `1` / `2` - signal group selection
 - `G` / `Y` / `R` - traffic light control
 - `P` - pause
