@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 
 // forward declarations
 void drawBox(float sx, float sy, float sz);
@@ -24,6 +25,9 @@ struct Car
     float speed;
     int direction;
     bool active;
+    float r;
+    float g;
+    float b;
 };
 
 const int MAX_CARS = 12;
@@ -37,8 +41,15 @@ bool gameOver = false;
 int gameOverTime = 0;
 const int autoRestartSeconds = 5;
 
+// manual light control mode: when true, automatic signal switching is disabled
+bool manualControl = false;
+
 void updateTrafficLights(int currentTime)
 {
+    // Automatic switching disabled in manual control mode
+    if (manualControl)
+        return;
+
     if (lastSignalChangeTime == 0)
         lastSignalChangeTime = currentTime;
 
@@ -79,6 +90,20 @@ void resetCar(Car& car, int direction)
         car.z = -1.2f;
         car.speed = 5.1f;
     }
+
+    // assign a base color per direction with a small random variation
+    if (direction == 0) { car.r = 0.85f; car.g = 0.15f; car.b = 0.15f; }
+    else if (direction == 1) { car.r = 0.15f; car.g = 0.15f; car.b = 0.85f; }
+    else if (direction == 2) { car.r = 0.15f; car.g = 0.85f; car.b = 0.15f; }
+    else { car.r = 0.85f; car.g = 0.60f; car.b = 0.15f; }
+
+    // small random tint
+    float vr = (float)(rand() % 21 - 10) / 255.0f;
+    float vg = (float)(rand() % 21 - 10) / 255.0f;
+    float vb = (float)(rand() % 21 - 10) / 255.0f;
+    car.r = std::min(0.95f, std::max(0.05f, car.r + vr));
+    car.g = std::min(0.95f, std::max(0.05f, car.g + vg));
+    car.b = std::min(0.95f, std::max(0.05f, car.b + vb));
 }
 
 void spawnCar(int currentTime)
@@ -396,7 +421,11 @@ void drawHUD()
     sprintf(buf, "EW occupancy: %.0f%% (%d/%d)", occupancyEW * 100.0f, ewCountDisplay, laneCapacity);
     drawText2D(10, windowHeight - 44, buf);
 
+    // controls hint
+    drawText2D(10, windowHeight - 64, "Controls: R=restart  L=toggle manual lights  T=toggle lights  Esc=quit");
+
     // If game over, draw a large centered overlay with a translucent background
+
     if (gameOver)
     {
         int w = windowWidth;
@@ -602,28 +631,25 @@ void drawTrafficLight(float x, float z, float rotationY, bool verticalFacingGree
 
     bool greenActive = (northSouthGreen == verticalFacingGreen);
 
-    float redR = greenActive ? 0.12f : 0.85f;
-    float redG = greenActive ? 0.45f : 0.10f;
-    float redB = greenActive ? 0.12f : 0.10f;
+    // Make active lights bright and inactive ones dimmer for clarity
+    float redActiveR = 0.95f, redActiveG = 0.05f, redActiveB = 0.05f;
+    float redDimR = 0.25f, redDimG = 0.05f, redDimB = 0.05f;
 
-    float yellowR = 0.35f;
-    float yellowG = 0.30f;
-    float yellowB = 0.05f;
+    float yellowR = 0.9f, yellowG = 0.8f, yellowB = 0.1f;
 
-    float greenR = greenActive ? 0.15f : 0.05f;
-    float greenG = greenActive ? 0.85f : 0.20f;
-    float greenB = greenActive ? 0.15f : 0.05f;
+    float greenActiveR = 0.05f, greenActiveG = 0.95f, greenActiveB = 0.05f;
+    float greenDimR = 0.05f, greenDimG = 0.25f, greenDimB = 0.05f;
 
     glPushMatrix();
     glTranslatef(0.0f, 4.1f, 0.36f);
-    glColor3f(redR, redG, redB);
-    glutSolidSphere(0.08, 12, 12);
-    glTranslatef(0.0f, -0.22f, 0.0f);
+    if (!greenActive) glColor3f(redActiveR, redActiveG, redActiveB); else glColor3f(redDimR, redDimG, redDimB);
+    glutSolidSphere(0.12, 14, 14);
+    glTranslatef(0.0f, -0.28f, 0.0f);
     glColor3f(yellowR, yellowG, yellowB);
-    glutSolidSphere(0.08, 12, 12);
-    glTranslatef(0.0f, -0.22f, 0.0f);
-    glColor3f(greenR, greenG, greenB);
-    glutSolidSphere(0.08, 12, 12);
+    glutSolidSphere(0.12, 14, 14);
+    glTranslatef(0.0f, -0.28f, 0.0f);
+    if (greenActive) glColor3f(greenActiveR, greenActiveG, greenActiveB); else glColor3f(greenDimR, greenDimG, greenDimB);
+    glutSolidSphere(0.12, 14, 14);
     glPopMatrix();
 
     glPopMatrix();
@@ -651,18 +677,21 @@ void drawCar(const Car& car)
     else if (car.direction == 3)
         glRotatef(-90.0f, 0.0f, 1.0f, 0.0f);
 
-    glColor3f(0.85f, 0.15f, 0.15f);
+    // main body color from car
+    glColor3f(car.r, car.g, car.b);
     glPushMatrix();
     glTranslatef(0.0f, 0.2f, 0.0f);
     drawBox(1.0f, 0.4f, 2.0f);
     glPopMatrix();
 
-    glColor3f(0.65f, 0.05f, 0.05f);
+    // roof/upper slightly darker
+    glColor3f(std::max(0.0f, car.r - 0.15f), std::max(0.0f, car.g - 0.15f), std::max(0.0f, car.b - 0.15f));
     glPushMatrix();
     glTranslatef(0.0f, 0.55f, -0.05f);
     drawBox(0.8f, 0.3f, 1.0f);
     glPopMatrix();
 
+    // wheels
     glColor3f(0.1f, 0.1f, 0.1f);
     glPushMatrix();
     glTranslatef(-0.35f, -0.05f, 0.65f);
@@ -768,6 +797,7 @@ int main(int argc, char** argv)
 
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.55f, 0.75f, 0.95f, 1.0f);
+    srand((unsigned)time(NULL));
 
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
@@ -797,6 +827,20 @@ void keyboard(unsigned char key, int x, int y)
     if (key == 'r' || key == 'R')
     {
         resetSimulation();
+    }
+    else if (key == 'l' || key == 'L')
+    {
+        // toggle manual control mode
+        manualControl = !manualControl;
+        // if enabling manual, freeze the current signal state
+        lastSignalChangeTime = glutGet(GLUT_ELAPSED_TIME);
+    }
+    else if (key == 't' || key == 'T')
+    {
+        // manual toggle of current signal (useful when manualControl is on)
+        northSouthGreen = !northSouthGreen;
+        lastSignalChangeTime = glutGet(GLUT_ELAPSED_TIME);
+        // if we toggle while in auto mode, this simply flips immediately
     }
     else if (key == 27) // ESC
     {
