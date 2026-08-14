@@ -12,7 +12,43 @@ struct Car
     int direction;
 };
 
-Car demoCar = { 0.0f, 0.35f, -18.0f, 0.0f, 0 };
+Car demoCar = { 0.0f, 0.35f, -18.0f, 6.0f, 0 };
+int lastUpdateTime = 0;
+int lastSignalChangeTime = 0;
+bool northSouthGreen = false;
+
+void updateTrafficLights(int currentTime)
+{
+    if (lastSignalChangeTime == 0)
+        lastSignalChangeTime = currentTime;
+
+    if (currentTime - lastSignalChangeTime >= 5000)
+    {
+        northSouthGreen = !northSouthGreen;
+        lastSignalChangeTime = currentTime;
+    }
+}
+
+void updateCars(float dt)
+{
+    const float stopLineZ = -5.4f;
+    const float endResetZ = 18.0f;
+
+    if (northSouthGreen || demoCar.z >= stopLineZ)
+    {
+        demoCar.z += demoCar.speed * dt;
+    }
+    else
+    {
+        float nextZ = demoCar.z + demoCar.speed * dt;
+        if (nextZ > stopLineZ)
+            nextZ = stopLineZ;
+        demoCar.z = nextZ;
+    }
+
+    if (demoCar.z > endResetZ)
+        demoCar.z = -18.0f;
+}
 
 void drawGround()
 {
@@ -175,15 +211,19 @@ void drawTrafficLight(float x, float z, float rotationY, bool verticalFacingGree
     drawBox(0.6f, 0.9f, 0.35f);
     glPopMatrix();
 
-    float redR = 0.45f, redG = 0.05f, redB = 0.05f;
-    float yellowR = 0.45f, yellowG = 0.35f, yellowB = 0.05f;
-    float greenR = 0.05f, greenG = 0.45f, greenB = 0.05f;
+    bool greenActive = (northSouthGreen == verticalFacingGreen);
 
-    if (verticalFacingGreen)
-    {
-        redR = 0.8f; redG = 0.1f; redB = 0.1f;
-        greenR = 0.1f; greenG = 0.8f; greenB = 0.1f;
-    }
+    float redR = greenActive ? 0.12f : 0.85f;
+    float redG = greenActive ? 0.45f : 0.10f;
+    float redB = greenActive ? 0.12f : 0.10f;
+
+    float yellowR = 0.35f;
+    float yellowG = 0.30f;
+    float yellowB = 0.05f;
+
+    float greenR = greenActive ? 0.15f : 0.05f;
+    float greenG = greenActive ? 0.85f : 0.20f;
+    float greenB = greenActive ? 0.15f : 0.05f;
 
     glPushMatrix();
     glTranslatef(0.0f, 4.1f, 0.36f);
@@ -297,6 +337,18 @@ void reshape(int w, int h)
 
 void idle()
 {
+    int currentTime = glutGet(GLUT_ELAPSED_TIME);
+    if (lastUpdateTime == 0)
+        lastUpdateTime = currentTime;
+
+    if (lastSignalChangeTime == 0)
+        lastSignalChangeTime = currentTime;
+
+    float dt = (currentTime - lastUpdateTime) / 1000.0f;
+    lastUpdateTime = currentTime;
+
+    updateTrafficLights(currentTime);
+    updateCars(dt);
     glutPostRedisplay();
 }
 
