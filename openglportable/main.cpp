@@ -313,29 +313,50 @@ void drawBuildings()
     // South row (z = 32) - bottom area: trees and grass as requested
     for (int i = 0; i < 6; ++i)
     {
+        // place grass patch and a small tree for each south tile
         float xpos = xs[i];
         drawGrassPatch(xpos, 32.0f);
-        drawTree(xpos + (i%2 ? -1.2f : 1.2f), 32.0f - 1.5f);
+        drawTree(xpos + (i%2? -1.2f : 1.2f), 32.0f - 1.5f);
     }
 
-    // East column (x = 32)
+    // East column (x = 32) - top tiles should be buildings, bottom tiles trees/grass
     for (int i = 0; i < 6; ++i)
     {
-        glPushMatrix();
-        glTranslatef(32.0f, heights[i] * 0.5f, xs[i]);
-        glColor3f(0.5f - i*0.02f, 0.55f - i*0.02f, 0.6f - i*0.01f);
-        drawBox(8.0f, heights[i], 6.0f);
-        glPopMatrix();
+        float zpos = xs[i];
+        if (i >= 3)
+        {
+            // southern/bottom tiles: grass + tree
+            drawGrassPatch(32.0f, zpos);
+            drawTree(34.0f, zpos - 1.5f);
+        }
+        else
+        {
+            // northern/top tiles: small buildings
+            glPushMatrix();
+            glTranslatef(32.0f, heights[i] * 0.5f, zpos);
+            glColor3f(0.5f - i*0.02f, 0.55f - i*0.02f, 0.6f - i*0.01f);
+            drawSmallBuilding(8.0f, heights[i], 6.0f);
+            glPopMatrix();
+        }
     }
 
-    // West column (x = -32)
+    // West column (x = -32) - mirror of east column
     for (int i = 0; i < 6; ++i)
     {
-        glPushMatrix();
-        glTranslatef(-32.0f, heights[5-i] * 0.5f, xs[i]);
-        glColor3f(0.55f - i*0.03f, 0.5f + i*0.01f, 0.55f - i*0.02f);
-        drawBox(8.0f, heights[5-i], 6.0f);
-        glPopMatrix();
+        float zpos = xs[i];
+        if (i >= 3)
+        {
+            drawGrassPatch(-32.0f, zpos);
+            drawTree(-34.0f, zpos + 1.5f);
+        }
+        else
+        {
+            glPushMatrix();
+            glTranslatef(-32.0f, heights[5-i] * 0.5f, zpos);
+            glColor3f(0.55f - i*0.03f, 0.5f + i*0.01f, 0.55f - i*0.02f);
+            drawSmallBuilding(8.0f, heights[5-i], 6.0f);
+            glPopMatrix();
+        }
     }
 }
 
