@@ -3,6 +3,17 @@
 int windowWidth = 1280;
 int windowHeight = 720;
 
+struct Car
+{
+    float x;
+    float y;
+    float z;
+    float speed;
+    int direction;
+};
+
+Car demoCar = { 0.0f, 0.35f, -18.0f, 0.0f, 0 };
+
 void drawGround()
 {
     glColor3f(0.18f, 0.45f, 0.18f);
@@ -197,6 +208,56 @@ void drawTrafficLights()
     drawTrafficLight( 5.9f,  5.9f, -90.0f, false);
 }
 
+void drawCar(const Car& car)
+{
+    glPushMatrix();
+    glTranslatef(car.x, car.y, car.z);
+
+    if (car.direction == 0)
+        glRotatef(0.0f, 0.0f, 1.0f, 0.0f);
+    else if (car.direction == 1)
+        glRotatef(180.0f, 0.0f, 1.0f, 0.0f);
+    else if (car.direction == 2)
+        glRotatef(90.0f, 0.0f, 1.0f, 0.0f);
+    else if (car.direction == 3)
+        glRotatef(-90.0f, 0.0f, 1.0f, 0.0f);
+
+    glColor3f(0.85f, 0.15f, 0.15f);
+    glPushMatrix();
+    glTranslatef(0.0f, 0.2f, 0.0f);
+    drawBox(1.0f, 0.4f, 2.0f);
+    glPopMatrix();
+
+    glColor3f(0.65f, 0.05f, 0.05f);
+    glPushMatrix();
+    glTranslatef(0.0f, 0.55f, -0.05f);
+    drawBox(0.8f, 0.3f, 1.0f);
+    glPopMatrix();
+
+    glColor3f(0.1f, 0.1f, 0.1f);
+    glPushMatrix();
+    glTranslatef(-0.35f, -0.05f, 0.65f);
+    drawBox(0.25f, 0.25f, 0.25f);
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslatef(0.35f, -0.05f, 0.65f);
+    drawBox(0.25f, 0.25f, 0.25f);
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslatef(-0.35f, -0.05f, -0.65f);
+    drawBox(0.25f, 0.25f, 0.25f);
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslatef(0.35f, -0.05f, -0.65f);
+    drawBox(0.25f, 0.25f, 0.25f);
+    glPopMatrix();
+
+    glPopMatrix();
+}
+
 void display()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -214,6 +275,7 @@ void display()
     drawLaneMarkings();
     drawStopLines();
     drawTrafficLights();
+    drawCar(demoCar);
 
     glutSwapBuffers();
 }
