@@ -1,6 +1,8 @@
 #include <GL/glut.h>
 #include <vector>
 #include <algorithm>
+#include <cstdio>
+#include <cmath>
 
 int windowWidth = 1280;
 int windowHeight = 720;
@@ -233,6 +235,93 @@ void drawGround()
         glVertex3f(-45.0f, -0.01f,  45.0f);
     glEnd();
 }
+
+// --- Stage 10: Congestion tracking ---
+float occupancyNS = 0.0f; // combined north/south occupancy (0..1)
+float occupancyEW = 0.0f; // combined east/west occupancy (0..1)
+int laneCapacity = 1;
+
+void computeOccupancy()
+{
+    const float minGap = 2.2f;
+    const float approachLength = 12.6f; // distance from spawn (~18) to stop line (5.4)
+    int cap_per_lane = std::max(1, int(approachLength / minGap));
+    laneCapacity = cap_per_lane * 2; // both directions per axis
+
+    int ns_count = 0; // northbound (dir0) + southbound (dir1)
+    int ew_count = 0; // eastbound (dir2) + westbound (dir3)
+
+    for (int i = 0; i < MAX_CARS; ++i)
+    {
+        if (!cars[i].active) continue;
+        if (cars[i].direction == 0)
+        {
+            if (cars[i].z >= -18.0f && cars[i].z <= -5.4f) ns_count++;
+        }
+        else if (cars[i].direction == 1)
+        {
+            if (cars[i].z <= 18.0f && cars[i].z >= 5.4f) ns_count++;
+        }
+        else if (cars[i].direction == 2)
+        {
+            if (cars[i].x <= 18.0f && cars[i].x >= 5.4f) ew_count++;
+        }
+        else if (cars[i].direction == 3)
+        {
+            if (cars[i].x >= -18.0f && cars[i].x <= -5.4f) ew_count++;
+        }
+    }
+
+    // two lanes per axis (north and south), so total capacity for NS = cap_per_lane * 2
+    occupancyNS = float(ns_count) / float(cap_per_lane * 2);
+    occupancyEW = float(ew_count) / float(cap_per_lane * 2);
+
+    if (occupancyNS > 1.0f) occupancyNS = 1.0f;
+    if (occupancyEW > 1.0f) occupancyEW = 1.0f;
+}
+
+void drawText2D(int x, int y, const char* text)
+{
+    glRasterPos2i(x, y);
+    for (const char* p = text; *p; ++p)
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *p);
+}
+
+void drawHUD()
+{
+    computeOccupancy();
+
+    // switch to orthographic projection for HUD
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    gluOrtho2D(0, windowWidth, 0, windowHeight);
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glDisable(GL_DEPTH_TEST);
+
+    char buf[128];
+    int nsCountDisplay = int(round(occupancyNS * laneCapacity));
+    int ewCountDisplay = int(round(occupancyEW * laneCapacity));
+    sprintf(buf, "NS occupancy: %.0f%% (%d/%d)", occupancyNS * 100.0f, nsCountDisplay, laneCapacity);
+    glColor3f(1.0f, 1.0f, 1.0f);
+    drawText2D(10, windowHeight - 24, buf);
+
+    sprintf(buf, "EW occupancy: %.0f%% (%d/%d)", occupancyEW * 100.0f, ewCountDisplay, laneCapacity);
+    drawText2D(10, windowHeight - 44, buf);
+
+    glEnable(GL_DEPTH_TEST);
+
+    glPopMatrix();
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+}
+
+// --- end congestion tracking ---
 
 void drawRoad()
 {
