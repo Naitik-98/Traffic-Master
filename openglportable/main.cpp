@@ -1,4 +1,6 @@
 #include <GL/glut.h>
+#include <vector>
+#include <algorithm>
 
 int windowWidth = 1280;
 int windowHeight = 720;
@@ -83,64 +85,141 @@ void spawnCar(int currentTime)
     }
 }
 
-void updateSingleCar(Car& car, float dt)
-{
-    const float northSouthStopNorth = -5.4f;
-    const float northSouthStopSouth = 5.4f;
-    const float eastWestStopWest = -5.4f;
-    const float eastWestStopEast = 5.4f;
-    const float resetDistance = 20.0f;
-
-    if (car.direction == 0)
-    {
-        float nextZ = car.z + car.speed * dt;
-        if (!northSouthGreen && nextZ > northSouthStopNorth)
-            nextZ = northSouthStopNorth;
-        car.z = nextZ;
-
-        if (car.z > resetDistance)
-            car.active = false;
-    }
-    else if (car.direction == 1)
-    {
-        float nextZ = car.z - car.speed * dt;
-        if (!northSouthGreen && nextZ < northSouthStopSouth)
-            nextZ = northSouthStopSouth;
-        car.z = nextZ;
-
-        if (car.z < -resetDistance)
-            car.active = false;
-    }
-    else if (car.direction == 2)
-    {
-        float nextX = car.x - car.speed * dt;
-        if (northSouthGreen && nextX < eastWestStopEast)
-            nextX = eastWestStopEast;
-        car.x = nextX;
-
-        if (car.x < -resetDistance)
-            car.active = false;
-    }
-    else
-    {
-        float nextX = car.x + car.speed * dt;
-        if (northSouthGreen && nextX > eastWestStopWest)
-            nextX = eastWestStopWest;
-        car.x = nextX;
-
-        if (car.x > resetDistance)
-            car.active = false;
-    }
-}
-
 void updateCars(float dt, int currentTime)
 {
     spawnCar(currentTime);
 
-    for (int i = 0; i < MAX_CARS; ++i)
+    const float minGap = 2.2f; // minimum following distance
+    const float resetDistance = 20.0f;
+
+    // Process each direction separately to handle queues
+    for (int dir = 0; dir < 4; ++dir)
     {
-        if (cars[i].active)
-            updateSingleCar(cars[i], dt);
+        std::vector<int> laneIndices;
+        for (int i = 0; i < MAX_CARS; ++i)
+            if (cars[i].active && cars[i].direction == dir)
+                laneIndices.push_back(i);
+
+        if (laneIndices.empty()) continue;
+
+        // Sort lane cars so leader is first
+        if (dir == 0) // moving +Z
+            std::sort(laneIndices.begin(), laneIndices.end(), [&](int a,int b){ return cars[a].z > cars[b].z; });
+        else if (dir == 1) // moving -Z
+            std::sort(laneIndices.begin(), laneIndices.end(), [&](int a,int b){ return cars[a].z < cars[b].z; });
+        else if (dir == 2) // moving -X
+            std::sort(laneIndices.begin(), laneIndices.end(), [&](int a,int b){ return cars[a].x < cars[b].x; });
+        else // dir == 3 moving +X
+            std::sort(laneIndices.begin(), laneIndices.end(), [&](int a,int b){ return cars[a].x > cars[b].x; });
+
+        for (size_t idx = 0; idx < laneIndices.size(); ++idx)
+        {
+            Car &car = cars[laneIndices[idx]];
+
+            // determine stop line for this lane
+            float stopLinePos = 0.0f;
+            bool isNorthSouth = (dir == 0 || dir == 1);
+            if (dir == 0) stopLinePos = -5.4f;      // northbound stops before -5.4
+            if (dir == 1) stopLinePos = 5.4f;       // southbound stops before 5.4
+            if (dir == 2) stopLinePos = 5.4f;       // eastbound stops before x=5.4 when northSouthGreen
+            if (dir == 3) stopLinePos = -5.4f;      // westbound stops before x=-5.4 when northSouthGreen
+
+            // intended movement
+            float move = car.speed * dt;
+
+            // leader handling
+            if (idx == 0)
+            {
+                // leader must obey red light
+                if (isNorthSouth)
+                {
+                    if (!northSouthGreen && dir == 0)
+                    {
+                        float maxZ = stopLinePos;
+                        if (car.z + move > maxZ)
+                            car.z = maxZ;
+                        else
+                            car.z += move;
+                    }
+                    else if (!northSouthGreen && dir == 1)
+                    {
+                        float minZ = stopLinePos;
+                        if (car.z - move < minZ)
+                            car.z = minZ;
+                        else
+                            car.z -= move;
+                    }
+                    else
+                    {
+                        // green for north-south
+                        if (dir == 0) car.z += move; else car.z -= move;
+                    }
+                }
+                else
+                {
+                    // east-west movement
+                    if (northSouthGreen)
+                    {
+                        // east-west must stop
+                        if (dir == 2)
+                        {
+                            float minX = stopLinePos;
+                            if (car.x - move < minX)
+                                car.x = minX;
+                            else
+                                car.x -= move;
+                        }
+                        else
+                        {
+                            float maxX = stopLinePos;
+                            if (car.x + move > maxX)
+                                car.x = maxX;
+                            else
+                                car.x += move;
+                        }
+                    }
+                    else
+                    {
+                        // east-west green
+                        if (dir == 2) car.x -= move; else car.x += move;
+                    }
+                }
+            }
+            else
+            {
+                // follow the car ahead
+                Car &lead = cars[laneIndices[idx-1]];
+
+                if (isNorthSouth)
+                {
+                    float distance = 0.0f;
+                    if (dir == 0) distance = lead.z - car.z;
+                    else distance = car.z - lead.z;
+
+                    float maxMove = distance - minGap;
+                    if (maxMove < 0.0f) maxMove = 0.0f;
+                    float actualMove = std::min(move, maxMove);
+
+                    if (dir == 0) car.z += actualMove; else car.z -= actualMove;
+                }
+                else
+                {
+                    float distance = 0.0f;
+                    if (dir == 2) distance = car.x - lead.x; else distance = lead.x - car.x;
+                    float maxMove = distance - minGap;
+                    if (maxMove < 0.0f) maxMove = 0.0f;
+                    float actualMove = std::min(move, maxMove);
+
+                    if (dir == 2) car.x -= actualMove; else car.x += actualMove;
+                }
+            }
+
+            // reset when out of bounds
+            if (car.direction == 0 && car.z > resetDistance) car.active = false;
+            if (car.direction == 1 && car.z < -resetDistance) car.active = false;
+            if (car.direction == 2 && car.x < -resetDistance) car.active = false;
+            if (car.direction == 3 && car.x > resetDistance) car.active = false;
+        }
     }
 }
 
