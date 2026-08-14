@@ -3,11 +3,15 @@
 #include <algorithm>
 #include <cstdio>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 
 // forward declarations
 void drawBox(float sx, float sy, float sz);
 void drawBuildings();
 void drawHUD();
+void resetSimulation();
+void keyboard(unsigned char key, int x, int y);
 
 int windowWidth = 1280;
 int windowHeight = 720;
@@ -29,6 +33,7 @@ int lastSignalChangeTime = 0;
 int lastSpawnTime = -1200;
 int nextSpawnDirection = 0;
 bool northSouthGreen = false;
+bool gameOver = false;
 
 void updateTrafficLights(int currentTime)
 {
@@ -346,7 +351,14 @@ void computeOccupancy()
 
     if (occupancyNS > 1.0f) occupancyNS = 1.0f;
     if (occupancyEW > 1.0f) occupancyEW = 1.0f;
+
+    // Game over if any approach is completely full
+    if ((occupancyNS >= 1.0f || occupancyEW >= 1.0f) && !gameOver)
+    {
+        gameOver = true;
+    }
 }
+
 
 void drawText2D(int x, int y, const char* text)
 {
@@ -380,6 +392,38 @@ void drawHUD()
 
     sprintf(buf, "EW occupancy: %.0f%% (%d/%d)", occupancyEW * 100.0f, ewCountDisplay, laneCapacity);
     drawText2D(10, windowHeight - 44, buf);
+
+    // If game over, draw a large centered overlay with a translucent background
+    if (gameOver)
+    {
+        int w = windowWidth;
+        int h = windowHeight;
+        int bw = (w * 6) / 10;
+        int bh = (h * 3) / 10;
+        int bx = (w - bw) / 2;
+        int by = (h - bh) / 2;
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glColor4f(0.0f, 0.0f, 0.0f, 0.6f);
+        glBegin(GL_QUADS);
+            glVertex2i(bx, by);
+            glVertex2i(bx + bw, by);
+            glVertex2i(bx + bw, by + bh);
+            glVertex2i(bx, by + bh);
+        glEnd();
+        glDisable(GL_BLEND);
+
+        const char* go = "GAME OVER";
+        const char* hint = "Press R to restart";
+        glColor3f(1.0f, 0.2f, 0.2f);
+        int gx = w / 2 - (int)(6 * strlen(go));
+        int gy = h / 2 + 10;
+        drawText2D(gx, gy, go);
+        glColor3f(1.0f, 1.0f, 1.0f);
+        int hx = w / 2 - (int)(7 * strlen(hint));
+        drawText2D(hx, gy - 28, hint);
+    }
 
     glEnable(GL_DEPTH_TEST);
 
@@ -685,8 +729,11 @@ void idle()
     float dt = (currentTime - lastUpdateTime) / 1000.0f;
     lastUpdateTime = currentTime;
 
-    updateTrafficLights(currentTime);
-    updateCars(dt, currentTime);
+    if (!gameOver)
+    {
+        updateTrafficLights(currentTime);
+        updateCars(dt, currentTime);
+    }
     glutPostRedisplay();
 }
 
@@ -704,7 +751,34 @@ int main(int argc, char** argv)
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
     glutIdleFunc(idle);
+    glutKeyboardFunc(keyboard);
 
     glutMainLoop();
     return 0;
 }
+
+void resetSimulation()
+{
+    for (int i = 0; i < MAX_CARS; ++i)
+        cars[i].active = false;
+    lastSpawnTime = -1200;
+    lastSignalChangeTime = glutGet(GLUT_ELAPSED_TIME);
+    lastUpdateTime = glutGet(GLUT_ELAPSED_TIME);
+    nextSpawnDirection = 0;
+    northSouthGreen = false;
+    gameOver = false;
+    occupancyNS = occupancyEW = 0.0f;
+}
+
+void keyboard(unsigned char key, int x, int y)
+{
+    if (key == 'r' || key == 'R')
+    {
+        resetSimulation();
+    }
+    else if (key == 27) // ESC
+    {
+        std::exit(0);
+    }
+}
+
