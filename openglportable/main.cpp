@@ -10,11 +10,15 @@ struct Car
     float z;
     float speed;
     int direction;
+    bool active;
 };
 
-Car demoCar = { 0.0f, 0.35f, -18.0f, 6.0f, 0 };
+const int MAX_CARS = 12;
+Car cars[MAX_CARS];
 int lastUpdateTime = 0;
 int lastSignalChangeTime = 0;
+int lastSpawnTime = -1200;
+int nextSpawnDirection = 0;
 bool northSouthGreen = false;
 
 void updateTrafficLights(int currentTime)
@@ -29,25 +33,115 @@ void updateTrafficLights(int currentTime)
     }
 }
 
-void updateCars(float dt)
+void resetCar(Car& car, int direction)
 {
-    const float stopLineZ = -5.4f;
-    const float endResetZ = 18.0f;
+    car.active = true;
+    car.direction = direction;
+    car.y = 0.35f;
 
-    if (northSouthGreen || demoCar.z >= stopLineZ)
+    if (direction == 0)
     {
-        demoCar.z += demoCar.speed * dt;
+        car.x = -1.2f;
+        car.z = -18.0f;
+        car.speed = 4.8f;
+    }
+    else if (direction == 1)
+    {
+        car.x = 1.2f;
+        car.z = 18.0f;
+        car.speed = 5.3f;
+    }
+    else if (direction == 2)
+    {
+        car.x = 18.0f;
+        car.z = 1.2f;
+        car.speed = 4.6f;
     }
     else
     {
-        float nextZ = demoCar.z + demoCar.speed * dt;
-        if (nextZ > stopLineZ)
-            nextZ = stopLineZ;
-        demoCar.z = nextZ;
+        car.x = -18.0f;
+        car.z = -1.2f;
+        car.speed = 5.1f;
     }
+}
 
-    if (demoCar.z > endResetZ)
-        demoCar.z = -18.0f;
+void spawnCar(int currentTime)
+{
+    const int spawnInterval = 1200;
+    if (currentTime - lastSpawnTime < spawnInterval)
+        return;
+
+    for (int i = 0; i < MAX_CARS; ++i)
+    {
+        if (!cars[i].active)
+        {
+            resetCar(cars[i], nextSpawnDirection);
+            nextSpawnDirection = (nextSpawnDirection + 1) % 4;
+            lastSpawnTime = currentTime;
+            return;
+        }
+    }
+}
+
+void updateSingleCar(Car& car, float dt)
+{
+    const float northSouthStopNorth = -5.4f;
+    const float northSouthStopSouth = 5.4f;
+    const float eastWestStopWest = -5.4f;
+    const float eastWestStopEast = 5.4f;
+    const float resetDistance = 20.0f;
+
+    if (car.direction == 0)
+    {
+        float nextZ = car.z + car.speed * dt;
+        if (!northSouthGreen && nextZ > northSouthStopNorth)
+            nextZ = northSouthStopNorth;
+        car.z = nextZ;
+
+        if (car.z > resetDistance)
+            car.active = false;
+    }
+    else if (car.direction == 1)
+    {
+        float nextZ = car.z - car.speed * dt;
+        if (!northSouthGreen && nextZ < northSouthStopSouth)
+            nextZ = northSouthStopSouth;
+        car.z = nextZ;
+
+        if (car.z < -resetDistance)
+            car.active = false;
+    }
+    else if (car.direction == 2)
+    {
+        float nextX = car.x - car.speed * dt;
+        if (northSouthGreen && nextX < eastWestStopEast)
+            nextX = eastWestStopEast;
+        car.x = nextX;
+
+        if (car.x < -resetDistance)
+            car.active = false;
+    }
+    else
+    {
+        float nextX = car.x + car.speed * dt;
+        if (northSouthGreen && nextX > eastWestStopWest)
+            nextX = eastWestStopWest;
+        car.x = nextX;
+
+        if (car.x > resetDistance)
+            car.active = false;
+    }
+}
+
+void updateCars(float dt, int currentTime)
+{
+    spawnCar(currentTime);
+
+    for (int i = 0; i < MAX_CARS; ++i)
+    {
+        if (cars[i].active)
+            updateSingleCar(cars[i], dt);
+    }
 }
 
 void drawGround()
@@ -315,7 +409,12 @@ void display()
     drawLaneMarkings();
     drawStopLines();
     drawTrafficLights();
-    drawCar(demoCar);
+
+    for (int i = 0; i < MAX_CARS; ++i)
+    {
+        if (cars[i].active)
+            drawCar(cars[i]);
+    }
 
     glutSwapBuffers();
 }
@@ -348,7 +447,7 @@ void idle()
     lastUpdateTime = currentTime;
 
     updateTrafficLights(currentTime);
-    updateCars(dt);
+    updateCars(dt, currentTime);
     glutPostRedisplay();
 }
 
