@@ -4,6 +4,11 @@
 #include <cstdio>
 #include <cmath>
 
+// forward declarations
+void drawBox(float sx, float sy, float sz);
+void drawBuildings();
+void drawHUD();
+
 int windowWidth = 1280;
 int windowHeight = 720;
 
@@ -227,13 +232,76 @@ void updateCars(float dt, int currentTime)
 
 void drawGround()
 {
-    glColor3f(0.18f, 0.45f, 0.18f);
+    // Concrete ground instead of grass
+    glColor3f(0.45f, 0.45f, 0.45f);
     glBegin(GL_QUADS);
         glVertex3f(-45.0f, -0.01f, -45.0f);
         glVertex3f( 45.0f, -0.01f, -45.0f);
         glVertex3f( 45.0f, -0.01f,  45.0f);
         glVertex3f(-45.0f, -0.01f,  45.0f);
     glEnd();
+
+    // subtle darker tiles for visual variety
+    glColor3f(0.40f, 0.40f, 0.40f);
+    for (float x = -44.0f; x < 44.0f; x += 8.0f)
+    {
+        for (float z = -44.0f; z < 44.0f; z += 8.0f)
+        {
+            glBegin(GL_QUADS);
+                glVertex3f(x, -0.009f, z);
+                glVertex3f(x + 6.0f, -0.009f, z);
+                glVertex3f(x + 6.0f, -0.009f, z + 6.0f);
+                glVertex3f(x, -0.009f, z + 6.0f);
+            glEnd();
+        }
+    }
+}
+
+void drawBuildings()
+{
+    // Simple rows of blocky buildings around the scene edges
+    const float xs[] = {-30.0f, -18.0f, -6.0f, 6.0f, 18.0f, 30.0f};
+    const float heights[] = {4.0f, 3.0f, 5.0f, 3.5f, 4.5f, 3.2f};
+
+    // North row (z = -32)
+    for (int i = 0; i < 6; ++i)
+    {
+        glPushMatrix();
+        glTranslatef(xs[i], heights[i] * 0.5f, -32.0f);
+        glColor3f(0.55f - i*0.04f, 0.55f - i*0.03f, 0.6f - i*0.02f);
+        drawBox(6.0f, heights[i], 8.0f);
+        glPopMatrix();
+    }
+
+    // South row (z = 32)
+    for (int i = 0; i < 6; ++i)
+    {
+        glPushMatrix();
+        glTranslatef(xs[i], heights[5-i] * 0.5f, 32.0f);
+        glColor3f(0.6f - i*0.03f, 0.5f + i*0.02f, 0.5f - i*0.02f);
+        drawBox(6.0f, heights[5-i], 8.0f);
+        glPopMatrix();
+    }
+
+    // East column (x = 32)
+    for (int i = 0; i < 6; ++i)
+    {
+        glPushMatrix();
+        glTranslatef(32.0f, heights[i] * 0.5f, xs[i]);
+        glColor3f(0.5f - i*0.02f, 0.55f - i*0.02f, 0.6f - i*0.01f);
+        drawBox(8.0f, heights[i], 6.0f);
+        glPopMatrix();
+    }
+
+    // West column (x = -32)
+    for (int i = 0; i < 6; ++i)
+    {
+        glPushMatrix();
+        glTranslatef(-32.0f, heights[5-i] * 0.5f, xs[i]);
+        glColor3f(0.55f - i*0.03f, 0.5f + i*0.01f, 0.55f - i*0.02f);
+        drawBox(8.0f, heights[5-i], 6.0f);
+        glPopMatrix();
+    }
 }
 
 // --- Stage 10: Congestion tracking ---
@@ -571,6 +639,7 @@ void display()
               0.0f, 1.0f, 0.0f);
 
     drawGround();
+    drawBuildings();
     drawSidewalks();
     drawRoad();
     drawIntersectionFootprint();
@@ -583,6 +652,8 @@ void display()
         if (cars[i].active)
             drawCar(cars[i]);
     }
+
+    drawHUD();
 
     glutSwapBuffers();
 }
