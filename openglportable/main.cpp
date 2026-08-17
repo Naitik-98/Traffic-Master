@@ -298,66 +298,62 @@ void drawGround()
 
 void drawBuildings()
 {
-    // Simple rows of blocky buildings around the scene edges
-    const float xs[] = {-30.0f, -18.0f, -6.0f, 6.0f, 18.0f, 30.0f};
-    const float heights[] = {4.0f, 3.0f, 5.0f, 3.5f, 4.5f, 3.2f};
+    // The 4 quadrants (tiles areas)
+    // We will place a few buildings and trees in each quadrant to make it look less crowded.
 
-    // North row (z = -32)
-    for (int i = 0; i < 6; ++i)
-    {
-        glPushMatrix();
-        glTranslatef(xs[i], heights[i] * 0.5f, -32.0f);
-        glColor3f(0.55f - i*0.04f, 0.55f - i*0.03f, 0.6f - i*0.02f);
-        drawBox(6.0f, heights[i], 8.0f);
-        glPopMatrix();
-    }
+    struct Item {
+        int type; // 0 = building, 1 = tree
+        float x, z;
+        float sx, sy, sz; // for building
+        float r, g, b; // for building color
+    };
 
-    // South row (z = 32) - bottom area: trees and grass as requested
-    for (int i = 0; i < 6; ++i)
-    {
-        // place grass patch and a small tree for each south tile
-        float xpos = xs[i];
-        drawGrassPatch(xpos, 32.0f);
-        drawTree(xpos + (i%2? -1.2f : 1.2f), 32.0f - 1.5f);
-    }
+    Item items[] = {
+        // Top-Left (NW)
+        {0, -18.0f, -18.0f, 6.0f, 5.0f, 6.0f, 0.55f, 0.55f, 0.60f},
+        {0, -32.0f, -24.0f, 8.0f, 4.0f, 8.0f, 0.50f, 0.52f, 0.58f},
+        {1, -12.0f, -28.0f, 0, 0, 0, 0, 0, 0},
+        {1, -26.0f, -14.0f, 0, 0, 0, 0, 0, 0},
+        {1, -20.0f, -34.0f, 0, 0, 0, 0, 0, 0},
 
-    // East column (x = 32) - top tiles should be buildings, bottom tiles trees/grass
-    for (int i = 0; i < 6; ++i)
+        // Top-Right (NE)
+        {0,  20.0f, -16.0f, 6.0f, 6.0f, 8.0f, 0.58f, 0.56f, 0.62f},
+        {0,  30.0f, -30.0f, 7.0f, 4.5f, 7.0f, 0.52f, 0.55f, 0.59f},
+        {1,  14.0f, -26.0f, 0, 0, 0, 0, 0, 0},
+        {1,  28.0f, -14.0f, 0, 0, 0, 0, 0, 0},
+        {1,  18.0f, -34.0f, 0, 0, 0, 0, 0, 0},
+
+        // Bottom-Left (SW)
+        {0, -22.0f,  20.0f, 7.0f, 5.5f, 7.0f, 0.56f, 0.58f, 0.60f},
+        {0, -16.0f,  34.0f, 6.0f, 4.0f, 6.0f, 0.53f, 0.51f, 0.55f},
+        {1, -12.0f,  16.0f, 0, 0, 0, 0, 0, 0},
+        {1, -30.0f,  26.0f, 0, 0, 0, 0, 0, 0},
+        {1, -24.0f,  12.0f, 0, 0, 0, 0, 0, 0},
+
+        // Bottom-Right (SE)
+        {0,  18.0f,  22.0f, 6.0f, 7.0f, 6.0f, 0.54f, 0.54f, 0.61f},
+        {0,  32.0f,  28.0f, 8.0f, 3.5f, 6.0f, 0.51f, 0.53f, 0.57f},
+        {1,  14.0f,  32.0f, 0, 0, 0, 0, 0, 0},
+        {1,  30.0f,  16.0f, 0, 0, 0, 0, 0, 0},
+        {1,  22.0f,  12.0f, 0, 0, 0, 0, 0, 0}
+    };
+
+    int numItems = sizeof(items) / sizeof(items[0]);
+
+    for (int i = 0; i < numItems; ++i)
     {
-        float zpos = xs[i];
-        if (i >= 3)
+        if (items[i].type == 0)
         {
-            // southern/bottom tiles: grass + tree
-            drawGrassPatch(32.0f, zpos);
-            drawTree(34.0f, zpos - 1.5f);
+            glPushMatrix();
+            glTranslatef(items[i].x, items[i].sy * 0.5f, items[i].z);
+            glColor3f(items[i].r, items[i].g, items[i].b);
+            drawBox(items[i].sx, items[i].sy, items[i].sz);
+            glPopMatrix();
         }
         else
         {
-            // northern/top tiles: small buildings
-            glPushMatrix();
-            glTranslatef(32.0f, heights[i] * 0.5f, zpos);
-            glColor3f(0.5f - i*0.02f, 0.55f - i*0.02f, 0.6f - i*0.01f);
-            drawSmallBuilding(8.0f, heights[i], 6.0f);
-            glPopMatrix();
-        }
-    }
-
-    // West column (x = -32) - mirror of east column
-    for (int i = 0; i < 6; ++i)
-    {
-        float zpos = xs[i];
-        if (i >= 3)
-        {
-            drawGrassPatch(-32.0f, zpos);
-            drawTree(-34.0f, zpos + 1.5f);
-        }
-        else
-        {
-            glPushMatrix();
-            glTranslatef(-32.0f, heights[5-i] * 0.5f, zpos);
-            glColor3f(0.55f - i*0.03f, 0.5f + i*0.01f, 0.55f - i*0.02f);
-            drawSmallBuilding(8.0f, heights[5-i], 6.0f);
-            glPopMatrix();
+            drawGrassPatch(items[i].x, items[i].z);
+            drawTree(items[i].x, items[i].z);
         }
     }
 }
