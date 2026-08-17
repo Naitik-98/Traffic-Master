@@ -1,4 +1,6 @@
 #include <GL/glut.h>
+#include <windows.h>
+#include <mmsystem.h>
 #include <vector>
 #include <algorithm>
 #include <cstdio>
@@ -859,6 +861,9 @@ void idle()
 
 int main(int argc, char** argv)
 {
+    mciSendString("open \"../Media/traffic_sound.mp3\" type mpegvideo alias bgm", NULL, 0, NULL);
+    mciSendString("play bgm repeat", NULL, 0, NULL);
+
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
     glutInitWindowSize(windowWidth, windowHeight);
