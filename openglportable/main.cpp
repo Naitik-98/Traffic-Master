@@ -45,12 +45,12 @@ bool gameOver = false;
 int gameOverTime = 0;
 const int autoRestartSeconds = 5;
 
-// manual light control mode: when true, automatic signal switching is disabled
+// True disables auto signals
 bool manualControl = false;
 
 void updateTrafficLights(int currentTime)
 {
-    // Automatic switching disabled in manual control mode
+    // Skip if manual
     if (manualControl)
         return;
 
@@ -95,13 +95,13 @@ void resetCar(Car& car, int direction)
         car.speed = 5.1f;
     }
 
-    // assign a base color per direction with a small random variation
+    // Base color with some randomness
     if (direction == 0) { car.r = 0.85f; car.g = 0.15f; car.b = 0.15f; }
     else if (direction == 1) { car.r = 0.15f; car.g = 0.15f; car.b = 0.85f; }
     else if (direction == 2) { car.r = 0.15f; car.g = 0.85f; car.b = 0.15f; }
     else { car.r = 0.85f; car.g = 0.60f; car.b = 0.15f; }
 
-    // small random tint
+    // Add tint
     float vr = (float)(rand() % 21 - 10) / 255.0f;
     float vg = (float)(rand() % 21 - 10) / 255.0f;
     float vb = (float)(rand() % 21 - 10) / 255.0f;
@@ -132,10 +132,10 @@ void updateCars(float dt, int currentTime)
 {
     spawnCar(currentTime);
 
-    const float minGap = 2.2f; // minimum following distance
+    const float minGap = 2.2f; // Min follow dist
     const float resetDistance = 20.0f;
 
-    // Process each direction separately to handle queues
+    // Handle queues per direction
     for (int dir = 0; dir < 4; ++dir)
     {
         std::vector<int> laneIndices;
@@ -145,8 +145,8 @@ void updateCars(float dt, int currentTime)
 
         if (laneIndices.empty()) continue;
 
-        // Sort lane cars so leader is first
-        if (dir == 0) // moving +Z
+        // Leader first
+        if (dir == 0)
             std::sort(laneIndices.begin(), laneIndices.end(), [&](int a,int b){ return cars[a].z > cars[b].z; });
         else if (dir == 1) // moving -Z
             std::sort(laneIndices.begin(), laneIndices.end(), [&](int a,int b){ return cars[a].z < cars[b].z; });
@@ -248,7 +248,7 @@ void updateCars(float dt, int currentTime)
                 }
             }
 
-            // reset when out of bounds
+            // Despawn out of bounds
             if (car.direction == 0 && car.z > resetDistance) car.active = false;
             if (car.direction == 1 && car.z < -resetDistance) car.active = false;
             if (car.direction == 2 && car.x < -resetDistance) car.active = false;
@@ -259,7 +259,7 @@ void updateCars(float dt, int currentTime)
 
 void drawGround()
 {
-    // Concrete ground instead of grass
+    // Concrete base
     glColor3f(0.45f, 0.45f, 0.45f);
     glBegin(GL_QUADS);
         glVertex3f(-45.0f, -0.01f, -45.0f);
@@ -268,7 +268,7 @@ void drawGround()
         glVertex3f(-45.0f, -0.01f,  45.0f);
     glEnd();
 
-    // subtle darker tiles for visual variety
+    // Darker tiles for detail
     glColor3f(0.40f, 0.40f, 0.40f);
     for (float x = -44.0f; x < 44.0f; x += 8.0f)
     {
@@ -286,39 +286,39 @@ void drawGround()
 
 void drawBuildings()
 {
-    // The 4 quadrants (tiles areas)
-    // We will place a few buildings and trees in each quadrant to make it look less crowded.
+    // 4 quadrants
+    // Spread out buildings and trees
 
     struct Item {
-        int type; // 0 = building, 1 = tree
+        int type; // 0: building, 1: tree
         float x, z;
-        float sx, sy, sz; // for building
-        float r, g, b; // for building color
+        float sx, sy, sz; // Bldg scale
+        float r, g, b; // Bldg color
     };
 
     Item items[] = {
-        // Top-Left (NW)
+        // NW
         {0, -18.0f, -18.0f, 6.0f, 5.0f, 6.0f, 0.55f, 0.55f, 0.60f},
         {0, -32.0f, -24.0f, 8.0f, 4.0f, 8.0f, 0.50f, 0.52f, 0.58f},
         {1, -12.0f, -28.0f, 0, 0, 0, 0, 0, 0},
         {1, -26.0f, -14.0f, 0, 0, 0, 0, 0, 0},
         {1, -20.0f, -34.0f, 0, 0, 0, 0, 0, 0},
 
-        // Top-Right (NE)
+        // NE
         {0,  20.0f, -16.0f, 6.0f, 6.0f, 8.0f, 0.58f, 0.56f, 0.62f},
         {0,  30.0f, -30.0f, 7.0f, 4.5f, 7.0f, 0.52f, 0.55f, 0.59f},
         {1,  14.0f, -26.0f, 0, 0, 0, 0, 0, 0},
         {1,  28.0f, -14.0f, 0, 0, 0, 0, 0, 0},
         {1,  18.0f, -34.0f, 0, 0, 0, 0, 0, 0},
 
-        // Bottom-Left (SW)
+        // SW
         {0, -22.0f,  20.0f, 7.0f, 5.5f, 7.0f, 0.56f, 0.58f, 0.60f},
         {0, -16.0f,  34.0f, 6.0f, 4.0f, 6.0f, 0.53f, 0.51f, 0.55f},
         {1, -12.0f,  16.0f, 0, 0, 0, 0, 0, 0},
         {1, -30.0f,  26.0f, 0, 0, 0, 0, 0, 0},
         {1, -24.0f,  12.0f, 0, 0, 0, 0, 0, 0},
 
-        // Bottom-Right (SE)
+        // SE
         {0,  18.0f,  22.0f, 6.0f, 7.0f, 6.0f, 0.54f, 0.54f, 0.61f},
         {0,  32.0f,  28.0f, 8.0f, 3.5f, 6.0f, 0.51f, 0.53f, 0.57f},
         {1,  14.0f,  32.0f, 0, 0, 0, 0, 0, 0},
@@ -346,14 +346,14 @@ void drawBuildings()
     }
 }
 
-// --- Stage 10: Congestion tracking ---
-float occupancyNS = 0.0f; // combined north/south occupancy (0..1)
-float occupancyEW = 0.0f; // combined east/west occupancy (0..1)
+// Congestion tracking
+float occupancyNS = 0.0f; // N/S occ (0-1)
+float occupancyEW = 0.0f; // E/W occ (0-1)
 int laneCapacity = 1;
 
 void drawTree(float x, float z)
 {
-    // simple conical tree
+    // Basic tree
     glPushMatrix();
     glTranslatef(x, 0.0f, z);
     glColor3f(0.12f, 0.45f, 0.12f);
@@ -386,12 +386,12 @@ void drawGrassPatch(float x, float z)
 void computeOccupancy()
 {
     const float minGap = 2.2f;
-    const float approachLength = 12.6f; // distance from spawn (~18) to stop line (5.4)
+    const float approachLength = 12.6f; // Spawn to stop line dist
     int cap_per_lane = std::max(1, int(approachLength / minGap));
-    laneCapacity = cap_per_lane * 2; // both directions per axis
+    laneCapacity = cap_per_lane * 2; // Both ways
 
-    int ns_count = 0; // northbound (dir0) + southbound (dir1)
-    int ew_count = 0; // eastbound (dir2) + westbound (dir3)
+    int ns_count = 0; // North/South cars
+    int ew_count = 0; // East/West cars
 
     for (int i = 0; i < MAX_CARS; ++i)
     {
@@ -414,14 +414,14 @@ void computeOccupancy()
         }
     }
 
-    // two lanes per axis (north and south), so total capacity for NS = cap_per_lane * 2
+    // 2 lanes per axis
     occupancyNS = float(ns_count) / float(cap_per_lane * 2);
     occupancyEW = float(ew_count) / float(cap_per_lane * 2);
 
     if (occupancyNS > 1.0f) occupancyNS = 1.0f;
     if (occupancyEW > 1.0f) occupancyEW = 1.0f;
 
-    // Game over if any approach is completely full
+    // Fail on full approach
     if ((occupancyNS >= 1.0f || occupancyEW >= 1.0f) && !gameOver)
     {
         gameOver = true;
@@ -441,7 +441,7 @@ void drawHUD()
 {
     computeOccupancy();
 
-    // switch to orthographic projection for HUD
+    // Ortho for HUD
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
     glLoadIdentity();
@@ -463,10 +463,10 @@ void drawHUD()
     sprintf(buf, "EW occupancy: %.0f%% (%d/%d)", occupancyEW * 100.0f, ewCountDisplay, laneCapacity);
     drawText2D(10, windowHeight - 44, buf);
 
-    // controls hint
+    // Controls
     drawText2D(10, windowHeight - 64, "Controls: R=restart  L=toggle manual lights  T=toggle lights  Esc=quit");
 
-    // If game over, draw a large centered overlay with a translucent background
+    // Dim overlay on game over
 
     if (gameOver)
     {
@@ -498,7 +498,7 @@ void drawHUD()
         int hx = w / 2 - (int)(7 * strlen(hint));
         drawText2D(hx, gy - 28, hint);
 
-        // show auto-restart countdown if available
+        // Restart timer
         if (gameOverTime > 0)
         {
             int elapsedMs = glutGet(GLUT_ELAPSED_TIME) - gameOverTime;
@@ -519,7 +519,7 @@ void drawHUD()
     glMatrixMode(GL_MODELVIEW);
 }
 
-// --- end congestion tracking ---
+// End congestion tracking
 
 void drawRoad()
 {
@@ -665,7 +665,7 @@ void drawTrafficLight(float x, float z, float rotationY, bool verticalFacingGree
 
     bool greenActive = (northSouthGreen == verticalFacingGreen);
 
-    // Make active lights bright and inactive ones dimmer for clarity
+    // Dim inactive lights
     float redActiveR = 0.95f, redActiveG = 0.05f, redActiveB = 0.05f;
     float redDimR = 0.25f, redDimG = 0.05f, redDimB = 0.05f;
 
@@ -864,17 +864,17 @@ void keyboard(unsigned char key, int x, int y)
     }
     else if (key == 'l' || key == 'L')
     {
-        // toggle manual control mode
+        // Toggle manual
         manualControl = !manualControl;
-        // if enabling manual, freeze the current signal state
+        // Freeze timer on manual
         lastSignalChangeTime = glutGet(GLUT_ELAPSED_TIME);
     }
     else if (key == 't' || key == 'T')
     {
-        // manual toggle of current signal (useful when manualControl is on)
+        // Force light change
         northSouthGreen = !northSouthGreen;
         lastSignalChangeTime = glutGet(GLUT_ELAPSED_TIME);
-        // if we toggle while in auto mode, this simply flips immediately
+        // Flips immediately if auto
     }
     else if (key == 27) // ESC
     {
