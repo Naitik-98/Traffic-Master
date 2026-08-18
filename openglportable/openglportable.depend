@@ -51,8 +51,10 @@
 	<GL/glu.h>
 	<stdlib.h>
 
-1786726771 source:g:\github\projects\traffic-master\openglportable\main.cpp
+1787033555 source:g:\github\projects\traffic-master\openglportable\main.cpp
 	<GL/glut.h>
+	<windows.h>
+	<mmsystem.h>
 	<vector>
 	<algorithm>
 	<cstdio>

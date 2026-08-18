@@ -9,17 +9,14 @@
 #include <cstring>
 #include <ctime>
 
-// forward declarations
 void drawBox(float sx, float sy, float sz);
 void drawBuildings();
 void drawHUD();
 void resetSimulation();
 void keyboard(unsigned char key, int x, int y);
 
-// small decorative helpers
 void drawTree(float x, float z);
 void drawGrassPatch(float x, float z);
-void drawSmallBuilding(float sx, float sy, float sz);
 
 int windowWidth = 1280;
 int windowHeight = 720;
@@ -162,21 +159,17 @@ void updateCars(float dt, int currentTime)
         {
             Car &car = cars[laneIndices[idx]];
 
-            // determine stop line for this lane
             float stopLinePos = 0.0f;
             bool isNorthSouth = (dir == 0 || dir == 1);
-            if (dir == 0) stopLinePos = -5.4f;      // northbound stops before -5.4
-            if (dir == 1) stopLinePos = 5.4f;       // southbound stops before 5.4
-            if (dir == 2) stopLinePos = 5.4f;       // eastbound stops before x=5.4 when northSouthGreen
-            if (dir == 3) stopLinePos = -5.4f;      // westbound stops before x=-5.4 when northSouthGreen
+            if (dir == 0) stopLinePos = -5.4f;
+            if (dir == 1) stopLinePos = 5.4f;
+            if (dir == 2) stopLinePos = 5.4f;
+            if (dir == 3) stopLinePos = -5.4f;
 
-            // intended movement
             float move = car.speed * dt;
 
-            // leader handling
             if (idx == 0)
             {
-                // leader must obey red light
                 if (isNorthSouth)
                 {
                     if (!northSouthGreen && dir == 0)
@@ -197,16 +190,13 @@ void updateCars(float dt, int currentTime)
                     }
                     else
                     {
-                        // green for north-south
                         if (dir == 0) car.z += move; else car.z -= move;
                     }
                 }
                 else
                 {
-                    // east-west movement
                     if (northSouthGreen)
                     {
-                        // east-west must stop
                         if (dir == 2)
                         {
                             float minX = stopLinePos;
@@ -226,14 +216,12 @@ void updateCars(float dt, int currentTime)
                     }
                     else
                     {
-                        // east-west green
                         if (dir == 2) car.x -= move; else car.x += move;
                     }
                 }
             }
             else
             {
-                // follow the car ahead
                 Car &lead = cars[laneIndices[idx-1]];
 
                 if (isNorthSouth)
@@ -395,20 +383,6 @@ void drawGrassPatch(float x, float z)
     glPopMatrix();
 }
 
-void drawSmallBuilding(float sx, float sy, float sz)
-{
-    glPushMatrix();
-    glColor3f(0.6f, 0.6f, 0.65f);
-    drawBox(sx*0.375f, sy, sz*0.416f);
-    glColor3f(0.3f, 0.3f, 0.35f);
-    glPushMatrix();
-    glTranslatef(0.0f, sy*0.3f, sz*0.32f);
-    drawBox(sx*0.125f, sy*0.4f, sz*0.16f);
-    glPopMatrix();
-    glPopMatrix();
-}
-
-
 void computeOccupancy()
 {
     const float minGap = 2.2f;
@@ -560,14 +534,6 @@ void drawRoad()
         glVertex3f( 40.0f, 0.0f, -3.5f);
         glVertex3f( 40.0f, 0.0f,  3.5f);
         glVertex3f(-40.0f, 0.0f,  3.5f);
-    glEnd();
-
-    glColor3f(0.08f, 0.08f, 0.08f);
-    glBegin(GL_QUADS);
-        glVertex3f(-4.0f, 0.01f, -4.0f);
-        glVertex3f( 4.0f, 0.01f, -4.0f);
-        glVertex3f( 4.0f, 0.01f,  4.0f);
-        glVertex3f(-4.0f, 0.01f,  4.0f);
     glEnd();
 }
 
@@ -745,21 +711,18 @@ void drawCar(const Car& car)
     else if (car.direction == 3)
         glRotatef(-90.0f, 0.0f, 1.0f, 0.0f);
 
-    // main body color from car
     glColor3f(car.r, car.g, car.b);
     glPushMatrix();
     glTranslatef(0.0f, 0.2f, 0.0f);
     drawBox(1.0f, 0.4f, 2.0f);
     glPopMatrix();
 
-    // roof/upper slightly darker
     glColor3f(std::max(0.0f, car.r - 0.15f), std::max(0.0f, car.g - 0.15f), std::max(0.0f, car.b - 0.15f));
     glPushMatrix();
     glTranslatef(0.0f, 0.55f, -0.05f);
     drawBox(0.8f, 0.3f, 1.0f);
     glPopMatrix();
 
-    // wheels
     glColor3f(0.1f, 0.1f, 0.1f);
     glPushMatrix();
     glTranslatef(-0.35f, -0.05f, 0.65f);
