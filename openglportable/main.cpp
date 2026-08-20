@@ -47,7 +47,10 @@ bool northSouthGreen = false;
 bool gameOver = false;
 int gameOverTime = 0;
 const int autoRestartSeconds = 5;
-int simulationStartTime = 0; // ms — set on launch and reset
+int simulationStartTime   = 0;   // ms — set on launch and reset
+int gameOverElapsedMs     = 0;   // ms elapsed when game over triggered (frozen)
+float speedMultiplier     = 1.0f; // grows every 30 s
+int   lastSpeedTick       = 0;   // tracks last 30-s boundary (in seconds)
 
 // Traffic lights toggled only by T key
 
@@ -160,25 +163,25 @@ void resetCar(Car& car, int direction)
     {
         car.x = -1.2f;
         car.z = -18.0f;
-        car.speed = 4.8f;
+        car.speed = 4.8f * speedMultiplier;
     }
     else if (direction == 1)
     {
         car.x = 1.2f;
         car.z = 18.0f;
-        car.speed = 5.3f;
+        car.speed = 5.3f * speedMultiplier;
     }
     else if (direction == 2)
     {
         car.x = 18.0f;
         car.z = 1.2f;
-        car.speed = 4.6f;
+        car.speed = 4.6f * speedMultiplier;
     }
     else
     {
         car.x = -18.0f;
         car.z = -1.2f;
-        car.speed = 5.1f;
+        car.speed = 5.1f * speedMultiplier;
     }
 
     // Color by vehicle type (not by lane)
@@ -225,6 +228,15 @@ void spawnCar(int currentTime)
 
 void updateCars(float dt, int currentTime)
 {
+    // Speed ramp: +10% every 30 seconds
+    int elapsedSec = (currentTime - simulationStartTime) / 1000;
+    int tick = elapsedSec / 30;
+    if (tick > lastSpeedTick)
+    {
+        speedMultiplier += 0.10f * (tick - lastSpeedTick);
+        lastSpeedTick = tick;
+    }
+
     spawnCar(currentTime);
 
     const float minGap = 2.2f; // Min follow dist
@@ -817,6 +829,9 @@ void computeOccupancy()
     {
         gameOver = true;
         gameOverTime = glutGet(GLUT_ELAPSED_TIME);
+        // Freeze the timer
+        gameOverElapsedMs = gameOverTime - simulationStartTime;
+        if (gameOverElapsedMs < 0) gameOverElapsedMs = 0;
     }
 }
 
@@ -844,17 +859,16 @@ void drawHUD()
 
     glDisable(GL_DEPTH_TEST);
 
-    // NS/EW occupancy — centered at bottom, black
+    // NS/EW occupancy — two centered yellow lines at bottom
     {
-        char nsb[64], ewb[64];
-        int nsCountDisplay = int(round(occupancyNS * laneCapacity));
-        int ewCountDisplay = int(round(occupancyEW * laneCapacity));
-        sprintf(nsb, "NS: %.0f%%  EW: %.0f%%  (capacity %d)",
-                occupancyNS * 100.0f, occupancyEW * 100.0f, laneCapacity);
-        int bw = glutBitmapLength(GLUT_BITMAP_HELVETICA_18, (const unsigned char*)nsb);
-        int bx = (windowWidth - bw) / 2;
-        glColor3f(0.0f, 0.0f, 0.0f);
-        drawText2D(bx, 28, nsb);
+        char nsb[32], ewb[32];
+        sprintf(nsb, "NS: %.0f%%", occupancyNS * 100.0f);
+        sprintf(ewb, "EW: %.0f%%", occupancyEW * 100.0f);
+        glColor3f(1.0f, 0.85f, 0.0f);
+        int nw = glutBitmapLength(GLUT_BITMAP_HELVETICA_18, (const unsigned char*)nsb);
+        int ew = glutBitmapLength(GLUT_BITMAP_HELVETICA_18, (const unsigned char*)ewb);
+        drawText2D((windowWidth - nw) / 2, 48, nsb);
+        drawText2D((windowWidth - ew) / 2, 26, ewb);
     }
 
     // Controls - centered at top
@@ -865,11 +879,12 @@ void drawHUD()
         drawText2D(ctrlX, windowHeight - 24, ctrl);
     }
 
-    // Timer — centered, black, just below controls
+    // Timer — centered, black, just below controls (frozen at game over)
     {
-        int elapsedMs = glutGet(GLUT_ELAPSED_TIME) - simulationStartTime;
-        if (elapsedMs < 0) elapsedMs = 0;
-        int totalSecs = elapsedMs / 1000;
+        int displayMs = gameOver ? gameOverElapsedMs
+                                 : (glutGet(GLUT_ELAPSED_TIME) - simulationStartTime);
+        if (displayMs < 0) displayMs = 0;
+        int totalSecs = displayMs / 1000;
         int mins = totalSecs / 60;
         int secs = totalSecs % 60;
         char timeBuf[32];
@@ -903,16 +918,27 @@ void drawHUD()
         glDisable(GL_BLEND);
 
         const char* go = "GAME OVER";
-        const char* hint = "Press R to restart";
         glColor3f(1.0f, 0.2f, 0.2f);
         int gx = w / 2 - (int)(6 * strlen(go));
-        int gy = h / 2 + 10;
+        int gy = h / 2 + 24;
         drawText2D(gx, gy, go);
+
+        // Survival time
+        {
+            int ts = gameOverElapsedMs / 1000;
+            char survBuf[48];
+            sprintf(survBuf, "Survived: %02d:%02d", ts / 60, ts % 60);
+            glColor3f(1.0f, 0.85f, 0.20f);
+            int sw2 = glutBitmapLength(GLUT_BITMAP_HELVETICA_18, (const unsigned char*)survBuf);
+            drawText2D(w / 2 - sw2 / 2, gy - 28, survBuf);
+        }
+
+        const char* hint = "Press R to restart";
         glColor3f(1.0f, 1.0f, 1.0f);
         int hx = w / 2 - (int)(7 * strlen(hint));
-        drawText2D(hx, gy - 28, hint);
+        drawText2D(hx, gy - 56, hint);
 
-        // Restart timer
+        // Auto-restart countdown
         if (gameOverTime > 0)
         {
             int elapsedMs = glutGet(GLUT_ELAPSED_TIME) - gameOverTime;
@@ -921,7 +947,7 @@ void drawHUD()
             char tbuf[64];
             sprintf(tbuf, "Restarting in %d s", secsLeft);
             int tx = w / 2 - (int)(7 * strlen(tbuf));
-            drawText2D(tx, gy - 56, tbuf);
+            drawText2D(tx, gy - 84, tbuf);
         }
     }
 
@@ -1446,6 +1472,9 @@ void resetSimulation()
     gameOverTime = 0;
     occupancyNS = occupancyEW = 0.0f;
     simulationStartTime = glutGet(GLUT_ELAPSED_TIME);
+    gameOverElapsedMs   = 0;
+    speedMultiplier     = 1.0f;
+    lastSpeedTick       = 0;
     // Re-init people so they respawn at starting positions
     peopleInit = false;
     initPeople();
