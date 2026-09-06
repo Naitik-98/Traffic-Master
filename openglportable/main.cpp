@@ -10,18 +10,14 @@
 #include <ctime>
 
 void drawBox(float sx, float sy, float sz);
-void drawBuildings();
-void drawHUD();
 void resetSimulation();
 void keyboard(unsigned char key, int x, int y);
-
 void drawTree(float x, float z);
 void drawGrassPatch(float x, float z);
 
 int windowWidth = 1280;
 int windowHeight = 720;
 
-// vehicleType: 0=car, 1=car(2nd), 2=bus, 3=bike, 4=truck
 struct Car
 {
     float x;
@@ -33,36 +29,31 @@ struct Car
     float r;
     float g;
     float b;
-    int vehicleType;
+    int vehicleType; // 0,1: car, 2: bus, 3: bike, 4: truck
 };
 
 const int MAX_CARS = 12;
 Car cars[MAX_CARS];
-int nextVehicleType = 0; // Cycles: 0=car,1=car,2=bus,3=bike,4=truck
+int nextVehicleType = 0;
 int lastUpdateTime = 0;
-int lastSignalChangeTime = 0;
 int lastSpawnTime = -1200;
 int nextSpawnDirection = 0;
 bool northSouthGreen = false;
 bool gameOver = false;
 int gameOverTime = 0;
 const int autoRestartSeconds = 5;
-int simulationStartTime   = 0;   // ms — set on launch and reset
-int gameOverElapsedMs     = 0;   // ms elapsed when game over triggered (frozen)
-float speedMultiplier     = 1.0f; // grows every 30 s
-int   lastSpeedTick       = 0;   // tracks last 30-s boundary (in seconds)
+int simulationStartTime = 0;
+int gameOverElapsedMs = 0;
+float speedMultiplier = 1.0f;
+int lastSpeedTick = 0;
 
-// Traffic lights toggled only by T key
-
-// ---- Pedestrians ----
 struct Person {
-    float x, z;           // world position
-    float speed;          // units/sec
-    int   sidewalk;       // 0=NS-left(x=-4.45), 1=NS-right(x=+4.45)
-                          // 2=EW-top(z=-4.45),  3=EW-bottom(z=+4.45)
-    int   dir;            // +1 or -1 along the sidewalk axis
-    float phase;          // animation phase offset (radians)
-    bool  isJogger;
+    float x, z;
+    float speed;
+    int sidewalk; // 0: NS-left, 1: NS-right, 2: EW-top, 3: EW-bottom
+    int dir;
+    float phase;
+    bool isJogger;
     float skinR, skinG, skinB;
     float shirtR, shirtG, shirtB;
     float pantsR, pantsG, pantsB;
@@ -71,39 +62,32 @@ struct Person {
 
 const int MAX_PEOPLE = 16;
 Person people[MAX_PEOPLE];
-bool   peopleInit = false;
+bool peopleInit = false;
 
 void initPeople()
 {
-    // sidewalk center x/z values
-    // NS-left: x=-4.45  NS-right: x=+4.45
-    // EW-top:  z=-4.45  EW-bottom: z=+4.45
     struct PDef {
         int sw; int dir; float start;
         bool jog;
-        float sR,sG,sB;   // skin
-        float tR,tG,tB;   // shirt (top)
-        float pR,pG,pB;   // pants
-        float ht;          // height scale
+        float sR, sG, sB;
+        float tR, tG, tB;
+        float pR, pG, pB;
+        float ht;
     };
 
     PDef d[MAX_PEOPLE] = {
-        // NS-left (x=-4.45), walking/jogging in ±Z
         {0, +1,-30.f,false, 0.88f,0.68f,0.48f, 0.18f,0.42f,0.85f, 0.12f,0.12f,0.32f, 1.00f},
         {0, -1, 20.f,false, 0.55f,0.35f,0.20f, 0.85f,0.18f,0.18f, 0.22f,0.18f,0.14f, 0.93f},
         {0, +1, -8.f, true, 0.92f,0.72f,0.52f, 0.10f,0.72f,0.28f, 0.08f,0.08f,0.08f, 1.06f},
         {0, -1, 12.f,false, 0.48f,0.28f,0.14f, 0.72f,0.72f,0.08f, 0.18f,0.28f,0.48f, 0.96f},
-        // NS-right (x=+4.45)
         {1, +1,-22.f, true, 0.85f,0.75f,0.60f, 0.92f,0.28f,0.08f, 0.08f,0.08f,0.28f, 1.08f},
         {1, -1, 28.f,false, 0.38f,0.22f,0.12f, 0.28f,0.28f,0.82f, 0.18f,0.18f,0.18f, 0.91f},
         {1, +1,  4.f,false, 0.76f,0.56f,0.36f, 0.62f,0.08f,0.62f, 0.14f,0.22f,0.38f, 1.01f},
         {1, -1,-14.f, true, 0.90f,0.66f,0.46f, 0.08f,0.08f,0.82f, 0.28f,0.28f,0.28f, 1.03f},
-        // EW-top (z=-4.45)
         {2, +1,-26.f,false, 0.62f,0.42f,0.26f, 0.18f,0.62f,0.18f, 0.24f,0.18f,0.32f, 0.97f},
         {2, -1, 20.f, true, 0.88f,0.70f,0.50f, 0.82f,0.82f,0.08f, 0.08f,0.14f,0.08f, 1.07f},
         {2, +1,  6.f,false, 0.45f,0.28f,0.15f, 0.92f,0.92f,0.92f, 0.12f,0.12f,0.12f, 0.94f},
         {2, -1,-10.f,false, 0.82f,0.62f,0.42f, 0.72f,0.18f,0.52f, 0.18f,0.18f,0.38f, 1.00f},
-        // EW-bottom (z=+4.45)
         {3, +1,-16.f, true, 0.78f,0.58f,0.38f, 0.08f,0.82f,0.82f, 0.08f,0.08f,0.22f, 1.04f},
         {3, -1, 14.f,false, 0.52f,0.34f,0.20f, 0.62f,0.38f,0.18f, 0.18f,0.18f,0.18f, 0.95f},
         {3, +1, -6.f,false, 0.86f,0.66f,0.46f, 0.42f,0.08f,0.72f, 0.28f,0.22f,0.18f, 1.00f},
@@ -112,14 +96,14 @@ void initPeople()
 
     for (int i = 0; i < MAX_PEOPLE; ++i) {
         PDef& p = d[i];
-        people[i].sidewalk    = p.sw;
-        people[i].dir         = p.dir;
-        people[i].isJogger    = p.jog;
-        people[i].speed       = p.jog ? 4.2f + (i % 3) * 0.4f : 1.8f + (i % 4) * 0.25f;
-        people[i].phase       = i * 0.72f;
+        people[i].sidewalk = p.sw;
+        people[i].dir = p.dir;
+        people[i].isJogger = p.jog;
+        people[i].speed = p.jog ? 4.2f + (i % 3) * 0.4f : 1.8f + (i % 4) * 0.25f;
+        people[i].phase = i * 0.72f;
         people[i].skinR = p.sR; people[i].skinG = p.sG; people[i].skinB = p.sB;
-        people[i].shirtR= p.tR; people[i].shirtG= p.tG; people[i].shirtB= p.tB;
-        people[i].pantsR= p.pR; people[i].pantsG= p.pG; people[i].pantsB= p.pB;
+        people[i].shirtR = p.tR; people[i].shirtG = p.tG; people[i].shirtB = p.tB;
+        people[i].pantsR = p.pR; people[i].pantsG = p.pG; people[i].pantsB = p.pB;
         people[i].heightScale = p.ht;
         switch (p.sw) {
             case 0: people[i].x = -4.45f; people[i].z = p.start; break;
@@ -149,9 +133,6 @@ void updatePeople(float dt)
         }
     }
 }
-
-
-
 
 void resetCar(Car& car, int direction)
 {
@@ -184,17 +165,15 @@ void resetCar(Car& car, int direction)
         car.speed = 5.1f * speedMultiplier;
     }
 
-    // Color by vehicle type (not by lane)
-    // 0,1=car -> purple, 2=bus -> blue, 3=bike -> red, 4=truck -> dark yellow
     switch (car.vehicleType)
     {
-        case 0: case 1: // car - purple
+        case 0: case 1:
             car.r = 0.55f; car.g = 0.05f; car.b = 0.75f; break;
-        case 2: // bus - blue
+        case 2:
             car.r = 0.10f; car.g = 0.25f; car.b = 0.85f; break;
-        case 3: // bike - red
+        case 3:
             car.r = 0.85f; car.g = 0.08f; car.b = 0.08f; break;
-        case 4: // truck - dark yellow
+        case 4:
             car.r = 0.72f; car.g = 0.55f; car.b = 0.05f; break;
         default:
             car.r = 0.5f; car.g = 0.5f; car.b = 0.5f; break;
@@ -207,8 +186,6 @@ void spawnCar(int currentTime)
     if (currentTime - lastSpawnTime < spawnInterval)
         return;
 
-    // Vehicle type sequence: car, car, bus, bike, truck (repeat)
-    // Types 0,1 = car; 2 = bus; 3 = bike; 4 = truck
     static const int vehicleSequence[] = {0, 1, 2, 3, 4};
     static const int seqLen = 5;
 
@@ -228,7 +205,6 @@ void spawnCar(int currentTime)
 
 void updateCars(float dt, int currentTime)
 {
-    // Speed ramp: +10% every 30 seconds
     int elapsedSec = (currentTime - simulationStartTime) / 1000;
     int tick = elapsedSec / 30;
     if (tick > lastSpeedTick)
@@ -239,10 +215,9 @@ void updateCars(float dt, int currentTime)
 
     spawnCar(currentTime);
 
-    const float minGap = 2.2f; // Min follow dist
+    const float minGap = 2.2f;
     const float resetDistance = 20.0f;
 
-    // Handle queues per direction
     for (int dir = 0; dir < 4; ++dir)
     {
         std::vector<int> laneIndices;
@@ -252,15 +227,14 @@ void updateCars(float dt, int currentTime)
 
         if (laneIndices.empty()) continue;
 
-        // Leader first
         if (dir == 0)
-            std::sort(laneIndices.begin(), laneIndices.end(), [&](int a,int b){ return cars[a].z > cars[b].z; });
-        else if (dir == 1) // moving -Z
-            std::sort(laneIndices.begin(), laneIndices.end(), [&](int a,int b){ return cars[a].z < cars[b].z; });
-        else if (dir == 2) // moving -X
-            std::sort(laneIndices.begin(), laneIndices.end(), [&](int a,int b){ return cars[a].x < cars[b].x; });
-        else // dir == 3 moving +X
-            std::sort(laneIndices.begin(), laneIndices.end(), [&](int a,int b){ return cars[a].x > cars[b].x; });
+            std::sort(laneIndices.begin(), laneIndices.end(), [&](int a, int b){ return cars[a].z > cars[b].z; });
+        else if (dir == 1)
+            std::sort(laneIndices.begin(), laneIndices.end(), [&](int a, int b){ return cars[a].z < cars[b].z; });
+        else if (dir == 2)
+            std::sort(laneIndices.begin(), laneIndices.end(), [&](int a, int b){ return cars[a].x < cars[b].x; });
+        else
+            std::sort(laneIndices.begin(), laneIndices.end(), [&](int a, int b){ return cars[a].x > cars[b].x; });
 
         for (size_t idx = 0; idx < laneIndices.size(); ++idx)
         {
@@ -329,7 +303,7 @@ void updateCars(float dt, int currentTime)
             }
             else
             {
-                Car &lead = cars[laneIndices[idx-1]];
+                Car &lead = cars[laneIndices[idx - 1]];
 
                 if (isNorthSouth)
                 {
@@ -355,7 +329,6 @@ void updateCars(float dt, int currentTime)
                 }
             }
 
-            // Despawn out of bounds
             if (car.direction == 0 && car.z > resetDistance) car.active = false;
             if (car.direction == 1 && car.z < -resetDistance) car.active = false;
             if (car.direction == 2 && car.x < -resetDistance) car.active = false;
@@ -366,7 +339,6 @@ void updateCars(float dt, int currentTime)
 
 void drawGround()
 {
-    // Concrete base
     glColor3f(0.45f, 0.45f, 0.45f);
     glBegin(GL_QUADS);
         glVertex3f(-45.0f, -0.01f, -45.0f);
@@ -375,7 +347,6 @@ void drawGround()
         glVertex3f(-45.0f, -0.01f,  45.0f);
     glEnd();
 
-    // Darker tiles for detail
     glColor3f(0.40f, 0.40f, 0.40f);
     for (float x = -44.0f; x < 44.0f; x += 8.0f)
     {
@@ -391,49 +362,42 @@ void drawGround()
     }
 }
 
-// Draw a building with a window grid on all 4 vertical faces
 void drawBuildingWithWindows(float bx, float bz, float sx, float sy, float sz,
                              float r, float g, float b)
 {
     glPushMatrix();
     glTranslatef(bx, sy * 0.5f, bz);
 
-    // ---- Main body ----
     glColor3f(r, g, b);
     drawBox(sx, sy, sz);
 
-    // ---- Roof trim (slightly darker) ----
     glColor3f(std::max(0.0f, r - 0.12f), std::max(0.0f, g - 0.12f), std::max(0.0f, b - 0.10f));
     glPushMatrix();
     glTranslatef(0.0f, sy * 0.5f - 0.12f, 0.0f);
     drawBox(sx + 0.12f, 0.22f, sz + 0.12f);
     glPopMatrix();
 
-    // ---- Windows ----
-    // Window size and grid spacing
-    const float winW  = 0.32f;
-    const float winH  = 0.42f;
-    const float eps   = 0.025f;    // push windows just outside face
-    const float spacX = 1.0f;      // horizontal spacing
-    const float spacY = 1.05f;     // vertical spacing
-    const float yStart = -sy * 0.5f + 0.65f; // first row baseline
+    const float winW = 0.32f;
+    const float winH = 0.42f;
+    const float eps = 0.025f;
+    const float spacX = 1.0f;
+    const float spacY = 1.05f;
+    const float yStart = -sy * 0.5f + 0.65f;
 
-    int colsX = std::max(1, (int)(sx / spacX)); // cols on +Z/-Z faces
-    int colsZ = std::max(1, (int)(sz / spacX)); // cols on +X/-X faces
-    int rows   = std::max(1, (int)((sy - 0.9f) / spacY));
+    int colsX = std::max(1, (int)(sx / spacX));
+    int colsZ = std::max(1, (int)(sz / spacX));
+    int rows = std::max(1, (int)((sy - 0.9f) / spacY));
 
-    // Helper lambda: pick window color based on row/col pattern
     auto winColor = [](int row, int col, int seed) {
         int v = (row * 7 + col * 3 + seed) % 5;
-        if (v == 0) { // unlit
+        if (v == 0) {
             glColor3f(0.10f, 0.16f, 0.32f);
-        } else { // lit warm yellow
+        } else {
             float bright = 0.80f + (v % 3) * 0.06f;
             glColor3f(bright, bright * 0.88f, bright * 0.45f);
         }
     };
 
-    // +Z face
     for (int row = 0; row < rows; ++row) {
         for (int col = 0; col < colsX; ++col) {
             winColor(row, col, 1);
@@ -441,15 +405,14 @@ void drawBuildingWithWindows(float bx, float bz, float sx, float sy, float sz,
             float wy = yStart + spacY * row;
             float wz =  sz * 0.5f + eps;
             glBegin(GL_QUADS);
-                glVertex3f(wx - winW*0.5f, wy,          wz);
-                glVertex3f(wx + winW*0.5f, wy,          wz);
-                glVertex3f(wx + winW*0.5f, wy + winH,   wz);
-                glVertex3f(wx - winW*0.5f, wy + winH,   wz);
+                glVertex3f(wx - winW * 0.5f, wy,        wz);
+                glVertex3f(wx + winW * 0.5f, wy,        wz);
+                glVertex3f(wx + winW * 0.5f, wy + winH, wz);
+                glVertex3f(wx - winW * 0.5f, wy + winH, wz);
             glEnd();
         }
     }
 
-    // -Z face
     for (int row = 0; row < rows; ++row) {
         for (int col = 0; col < colsX; ++col) {
             winColor(row, col, 2);
@@ -457,15 +420,14 @@ void drawBuildingWithWindows(float bx, float bz, float sx, float sy, float sz,
             float wy = yStart + spacY * row;
             float wz = -sz * 0.5f - eps;
             glBegin(GL_QUADS);
-                glVertex3f(wx + winW*0.5f, wy,          wz);
-                glVertex3f(wx - winW*0.5f, wy,          wz);
-                glVertex3f(wx - winW*0.5f, wy + winH,   wz);
-                glVertex3f(wx + winW*0.5f, wy + winH,   wz);
+                glVertex3f(wx + winW * 0.5f, wy,        wz);
+                glVertex3f(wx - winW * 0.5f, wy,        wz);
+                glVertex3f(wx - winW * 0.5f, wy + winH, wz);
+                glVertex3f(wx + winW * 0.5f, wy + winH, wz);
             glEnd();
         }
     }
 
-    // +X face
     for (int row = 0; row < rows; ++row) {
         for (int col = 0; col < colsZ; ++col) {
             winColor(row, col, 3);
@@ -473,15 +435,14 @@ void drawBuildingWithWindows(float bx, float bz, float sx, float sy, float sz,
             float wy = yStart + spacY * row;
             float wz = -sz * 0.5f + spacX * (col + 0.5f);
             glBegin(GL_QUADS);
-                glVertex3f(wx, wy,         wz - winW*0.5f);
-                glVertex3f(wx, wy,         wz + winW*0.5f);
-                glVertex3f(wx, wy + winH,  wz + winW*0.5f);
-                glVertex3f(wx, wy + winH,  wz - winW*0.5f);
+                glVertex3f(wx, wy,        wz - winW * 0.5f);
+                glVertex3f(wx, wy,        wz + winW * 0.5f);
+                glVertex3f(wx, wy + winH, wz + winW * 0.5f);
+                glVertex3f(wx, wy + winH, wz - winW * 0.5f);
             glEnd();
         }
     }
 
-    // -X face
     for (int row = 0; row < rows; ++row) {
         for (int col = 0; col < colsZ; ++col) {
             winColor(row, col, 4);
@@ -489,10 +450,10 @@ void drawBuildingWithWindows(float bx, float bz, float sx, float sy, float sz,
             float wy = yStart + spacY * row;
             float wz = -sz * 0.5f + spacX * (col + 0.5f);
             glBegin(GL_QUADS);
-                glVertex3f(wx, wy,         wz + winW*0.5f);
-                glVertex3f(wx, wy,         wz - winW*0.5f);
-                glVertex3f(wx, wy + winH,  wz - winW*0.5f);
-                glVertex3f(wx, wy + winH,  wz + winW*0.5f);
+                glVertex3f(wx, wy,        wz + winW * 0.5f);
+                glVertex3f(wx, wy,        wz - winW * 0.5f);
+                glVertex3f(wx, wy + winH, wz - winW * 0.5f);
+                glVertex3f(wx, wy + winH, wz + winW * 0.5f);
             glEnd();
         }
     }
@@ -505,7 +466,6 @@ void drawPlayground(float px, float pz)
     glPushMatrix();
     glTranslatef(px, 0.0f, pz);
 
-    // --- Grass base ---
     glColor3f(0.22f, 0.68f, 0.22f);
     glBegin(GL_QUADS);
         glVertex3f(-3.5f, 0.012f, -3.5f);
@@ -514,7 +474,6 @@ void drawPlayground(float px, float pz)
         glVertex3f(-3.5f, 0.012f,  3.5f);
     glEnd();
 
-    // --- Sandbox (tan square in corner) ---
     glColor3f(0.85f, 0.75f, 0.45f);
     glBegin(GL_QUADS);
         glVertex3f( 1.2f, 0.02f,  1.2f);
@@ -522,50 +481,40 @@ void drawPlayground(float px, float pz)
         glVertex3f( 3.0f, 0.02f,  3.0f);
         glVertex3f( 1.2f, 0.02f,  3.0f);
     glEnd();
-    // Sandbox border
+
     glColor3f(0.55f, 0.35f, 0.15f);
     glPushMatrix(); glTranslatef( 2.1f, 0.06f,  1.2f); drawBox(1.8f, 0.12f, 0.10f); glPopMatrix();
     glPushMatrix(); glTranslatef( 2.1f, 0.06f,  3.0f); drawBox(1.8f, 0.12f, 0.10f); glPopMatrix();
     glPushMatrix(); glTranslatef( 1.2f, 0.06f,  2.1f); drawBox(0.10f, 0.12f, 1.8f); glPopMatrix();
     glPushMatrix(); glTranslatef( 3.0f, 0.06f,  2.1f); drawBox(0.10f, 0.12f, 1.8f); glPopMatrix();
 
-    // --- Swing set ---
-    // Two A-frame legs (left)
     glColor3f(0.55f, 0.55f, 0.60f);
-    // Left post pair
-    glPushMatrix(); glTranslatef(-2.5f, 0.75f, -1.2f); glRotatef(12.0f, 0,0,1); drawBox(0.10f, 1.5f, 0.10f); glPopMatrix();
-    glPushMatrix(); glTranslatef(-2.5f, 0.75f,  1.2f); glRotatef(-12.0f,0,0,1); drawBox(0.10f, 1.5f, 0.10f); glPopMatrix();
-    // Right post pair
-    glPushMatrix(); glTranslatef( 0.2f, 0.75f, -1.2f); glRotatef(12.0f, 0,0,1); drawBox(0.10f, 1.5f, 0.10f); glPopMatrix();
-    glPushMatrix(); glTranslatef( 0.2f, 0.75f,  1.2f); glRotatef(-12.0f,0,0,1); drawBox(0.10f, 1.5f, 0.10f); glPopMatrix();
-    // Top bar
+    glPushMatrix(); glTranslatef(-2.5f, 0.75f, -1.2f); glRotatef(12.0f, 0, 0, 1); drawBox(0.10f, 1.5f, 0.10f); glPopMatrix();
+    glPushMatrix(); glTranslatef(-2.5f, 0.75f,  1.2f); glRotatef(-12.0f, 0, 0, 1); drawBox(0.10f, 1.5f, 0.10f); glPopMatrix();
+    glPushMatrix(); glTranslatef( 0.2f, 0.75f, -1.2f); glRotatef(12.0f, 0, 0, 1); drawBox(0.10f, 1.5f, 0.10f); glPopMatrix();
+    glPushMatrix(); glTranslatef( 0.2f, 0.75f,  1.2f); glRotatef(-12.0f, 0, 0, 1); drawBox(0.10f, 1.5f, 0.10f); glPopMatrix();
     glPushMatrix(); glTranslatef(-1.15f, 1.55f, 0.0f); drawBox(1.5f, 0.10f, 0.10f); glPopMatrix();
-    // Swing 1 chains
+
     glColor3f(0.70f, 0.70f, 0.70f);
     glPushMatrix(); glTranslatef(-1.6f, 1.1f, -0.5f); drawBox(0.04f, 0.9f, 0.04f); glPopMatrix();
     glPushMatrix(); glTranslatef(-1.6f, 1.1f,  0.5f); drawBox(0.04f, 0.9f, 0.04f); glPopMatrix();
-    // Swing 1 seat
     glColor3f(0.20f, 0.40f, 0.80f);
     glPushMatrix(); glTranslatef(-1.6f, 0.62f, 0.0f); drawBox(0.50f, 0.06f, 0.24f); glPopMatrix();
-    // Swing 2 chains
+
     glColor3f(0.70f, 0.70f, 0.70f);
     glPushMatrix(); glTranslatef(-0.65f, 1.1f, -0.5f); drawBox(0.04f, 0.9f, 0.04f); glPopMatrix();
     glPushMatrix(); glTranslatef(-0.65f, 1.1f,  0.5f); drawBox(0.04f, 0.9f, 0.04f); glPopMatrix();
-    // Swing 2 seat
     glColor3f(0.85f, 0.25f, 0.25f);
     glPushMatrix(); glTranslatef(-0.65f, 0.62f, 0.0f); drawBox(0.50f, 0.06f, 0.24f); glPopMatrix();
 
-    // --- Slide ---
-    // Platform
     glColor3f(0.90f, 0.65f, 0.10f);
     glPushMatrix(); glTranslatef( 2.5f, 0.90f, -2.5f); drawBox(0.90f, 0.10f, 0.90f); glPopMatrix();
-    // Support legs
     glColor3f(0.55f, 0.55f, 0.60f);
     glPushMatrix(); glTranslatef( 2.1f, 0.44f, -2.1f); drawBox(0.08f, 0.88f, 0.08f); glPopMatrix();
     glPushMatrix(); glTranslatef( 2.9f, 0.44f, -2.1f); drawBox(0.08f, 0.88f, 0.08f); glPopMatrix();
     glPushMatrix(); glTranslatef( 2.1f, 0.44f, -2.9f); drawBox(0.08f, 0.88f, 0.08f); glPopMatrix();
     glPushMatrix(); glTranslatef( 2.9f, 0.44f, -2.9f); drawBox(0.08f, 0.88f, 0.08f); glPopMatrix();
-    // Ramp (inclined quad)
+
     glColor3f(0.85f, 0.30f, 0.30f);
     glBegin(GL_QUADS);
         glVertex3f( 2.1f, 0.85f, -2.2f);
@@ -573,7 +522,7 @@ void drawPlayground(float px, float pz)
         glVertex3f( 2.9f, 0.02f, -0.6f);
         glVertex3f( 2.1f, 0.02f, -0.6f);
     glEnd();
-    // Slide side rails
+
     glColor3f(0.90f, 0.65f, 0.10f);
     glBegin(GL_QUADS);
         glVertex3f( 2.1f, 0.85f, -2.2f);
@@ -593,88 +542,59 @@ void drawPlayground(float px, float pz)
 
 void drawBuildings()
 {
-    // 4 quadrants
-    // Spread out buildings and trees
-
     struct Item {
         int type; // 0: building, 1: tree, 2: playground
         float x, z;
-        float sx, sy, sz; // Bldg scale
-        float r, g, b; // Bldg color
+        float sx, sy, sz;
+        float r, g, b;
     };
 
     Item items[] = {
-        // NW
         {0, -18.0f, -18.0f, 6.0f, 5.0f, 6.0f, 0.55f, 0.55f, 0.60f},
         {0, -32.0f, -24.0f, 8.0f, 4.0f, 8.0f, 0.50f, 0.52f, 0.58f},
         {1, -12.0f, -28.0f, 0, 0, 0, 0, 0, 0},
         {1, -26.0f, -14.0f, 0, 0, 0, 0, 0, 0},
         {1, -20.0f, -34.0f, 0, 0, 0, 0, 0, 0},
 
-        // NE
         {0,  20.0f, -16.0f, 6.0f, 6.0f, 8.0f, 0.58f, 0.56f, 0.62f},
         {0,  30.0f, -30.0f, 7.0f, 4.5f, 7.0f, 0.52f, 0.55f, 0.59f},
         {1,  14.0f, -26.0f, 0, 0, 0, 0, 0, 0},
         {1,  28.0f, -14.0f, 0, 0, 0, 0, 0, 0},
         {1,  18.0f, -34.0f, 0, 0, 0, 0, 0, 0},
 
-        // SW
         {0, -22.0f,  20.0f, 7.0f, 5.5f, 7.0f, 0.56f, 0.58f, 0.60f},
         {0, -16.0f,  34.0f, 6.0f, 4.0f, 6.0f, 0.53f, 0.51f, 0.55f},
         {1, -12.0f,  16.0f, 0, 0, 0, 0, 0, 0},
         {1, -30.0f,  26.0f, 0, 0, 0, 0, 0, 0},
         {1, -24.0f,  12.0f, 0, 0, 0, 0, 0, 0},
 
-        // SE
         {0,  18.0f,  22.0f, 6.0f, 7.0f, 6.0f, 0.54f, 0.54f, 0.61f},
         {0,  32.0f,  28.0f, 8.0f, 3.5f, 6.0f, 0.51f, 0.53f, 0.57f},
         {1,  14.0f,  32.0f, 0, 0, 0, 0, 0, 0},
         {1,  30.0f,  16.0f, 0, 0, 0, 0, 0, 0},
         {1,  22.0f,  12.0f, 0, 0, 0, 0, 0, 0},
 
-        // --- Extra buildings ---
-        // NW: tall slim skyscraper
         {0, -26.0f, -36.0f, 4.0f, 9.0f, 4.0f, 0.48f, 0.50f, 0.58f},
-        // NE: wide low warehouse
         {0,  38.0f, -20.0f, 9.0f, 2.5f, 6.0f, 0.57f, 0.54f, 0.50f},
-        // NE: mid-rise office block
         {0,  24.0f, -38.0f, 5.0f, 7.0f, 5.0f, 0.60f, 0.58f, 0.65f},
-        // SW: slim glass tower
         {0, -36.0f,  16.0f, 3.5f, 10.0f, 3.5f, 0.52f, 0.60f, 0.68f},
-        // SW: large block
         {0, -30.0f,  38.0f, 8.0f, 5.0f, 7.0f, 0.54f, 0.52f, 0.56f},
-        // SE: corner tower
         {0,  36.0f,  36.0f, 5.0f, 8.0f, 5.0f, 0.56f, 0.57f, 0.64f},
 
-        // --- More buildings ---
-        // NW: squat wide block near road
         {0, -14.0f, -20.0f, 5.0f, 3.5f, 7.0f, 0.53f, 0.56f, 0.54f},
-        // NE: tall narrow tower
         {0,  36.0f, -10.0f, 3.0f, 11.0f, 3.0f, 0.50f, 0.55f, 0.65f},
-        // SW: medium brick-tone block
         {0, -38.0f,  30.0f, 6.0f, 6.0f, 6.0f, 0.60f, 0.50f, 0.46f},
-        // SE: long low strip
         {0,  22.0f,  36.0f, 10.0f, 3.0f, 5.0f, 0.52f, 0.54f, 0.58f},
-        // NW: mid office with warm tone
         {0, -38.0f, -12.0f, 5.0f, 8.0f, 5.0f, 0.62f, 0.58f, 0.52f},
 
-        // --- Fill-in buildings (mid zones) ---
-        // NW mid: small shop block
         {0, -10.0f, -14.0f, 4.0f, 2.8f, 5.0f, 0.58f, 0.55f, 0.50f},
-        // NE mid: medium office
         {0,  14.0f, -14.0f, 5.0f, 5.0f, 5.0f, 0.56f, 0.58f, 0.63f},
-        // NE outer: secondary block
         {0,  38.0f, -36.0f, 6.0f, 4.5f, 6.0f, 0.53f, 0.52f, 0.57f},
-        // SW mid: corner low block
         {0, -12.0f,  22.0f, 4.5f, 3.0f, 4.5f, 0.55f, 0.57f, 0.54f},
-        // SE mid: compact office
         {0,  14.0f,  16.0f, 5.0f, 6.0f, 5.0f, 0.54f, 0.55f, 0.62f},
-        // SW outer: tall residential
         {0, -20.0f,  38.0f, 4.0f, 7.5f, 4.0f, 0.57f, 0.53f, 0.58f},
-        // SE outer: wide flat depot
         {0,  36.0f,  18.0f, 7.0f, 2.5f, 8.0f, 0.52f, 0.54f, 0.50f},
 
-        // --- Fill-in trees (break up empty concrete) ---
         {1, -10.0f, -16.0f, 0, 0, 0, 0, 0, 0},
         {1,  12.0f, -18.0f, 0, 0, 0, 0, 0, 0},
         {1,  10.0f,  14.0f, 0, 0, 0, 0, 0, 0},
@@ -684,40 +604,26 @@ void drawBuildings()
         {1,  26.0f,  28.0f, 0, 0, 0, 0, 0, 0},
         {1, -16.0f,  12.0f, 0, 0, 0, 0, 0, 0},
 
-        // --- More buildings ---
-        // NW outer: tall cold-grey slab
         {0, -34.0f, -38.0f, 5.0f, 9.5f, 5.0f, 0.50f, 0.52f, 0.60f},
-        // NE mid: squat brick block
         {0,  16.0f, -30.0f, 6.0f, 4.0f, 5.0f, 0.61f, 0.52f, 0.47f},
-        // SE mid: slim residential
         {0,  26.0f,  14.0f, 3.5f, 7.0f, 3.5f, 0.55f, 0.57f, 0.63f},
-        // SW mid: low civic block
         {0, -28.0f,  14.0f, 6.0f, 3.5f, 6.0f, 0.57f, 0.60f, 0.56f},
-        // NW inner: narrow office
         {0, -16.0f, -30.0f, 4.0f, 6.5f, 4.0f, 0.54f, 0.55f, 0.61f},
 
-        // --- More trees ---
         {1, -32.0f, -10.0f, 0, 0, 0, 0, 0, 0},
         {1,  18.0f, -10.0f, 0, 0, 0, 0, 0, 0},
         {1,  32.0f,  10.0f, 0, 0, 0, 0, 0, 0},
         {1, -22.0f,  32.0f, 0, 0, 0, 0, 0, 0},
         {1,  18.0f,  30.0f, 0, 0, 0, 0, 0, 0},
 
-        // --- Playgrounds ---
         {2, -28.0f, -10.0f, 0, 0, 0, 0, 0, 0},
         {2,  24.0f,  24.0f, 0, 0, 0, 0, 0, 0},
 
-        // --- Even More Buildings ---
-        // NW: small filler building
         {0, -18.0f, -10.0f, 4.0f, 3.0f, 4.0f, 0.51f, 0.58f, 0.51f},
-        // NE: small filler building
         {0,  18.0f, -22.0f, 3.5f, 4.0f, 3.5f, 0.59f, 0.51f, 0.59f},
-        // SW: small filler building
         {0, -20.0f,  26.0f, 4.0f, 4.5f, 4.0f, 0.53f, 0.58f, 0.61f},
-        // SE: small filler building
         {0,  28.0f,  20.0f, 4.5f, 3.5f, 4.5f, 0.61f, 0.55f, 0.52f},
 
-        // --- Even More Trees ---
         {1, -14.0f, -10.0f, 0, 0, 0, 0, 0, 0},
         {1,  22.0f, -18.0f, 0, 0, 0, 0, 0, 0},
         {1, -26.0f,  20.0f, 0, 0, 0, 0, 0, 0},
@@ -749,14 +655,11 @@ void drawBuildings()
     }
 }
 
-// Congestion tracking
-float occupancyNS = 0.0f; // N/S occ (0-1)
-float occupancyEW = 0.0f; // E/W occ (0-1)
-int laneCapacity = 1;
+float occupancyNS = 0.0f;
+float occupancyEW = 0.0f;
 
 void drawTree(float x, float z)
 {
-    // Basic tree
     glPushMatrix();
     glTranslatef(x, 0.0f, z);
     glColor3f(0.12f, 0.45f, 0.12f);
@@ -789,12 +692,11 @@ void drawGrassPatch(float x, float z)
 void computeOccupancy()
 {
     const float minGap = 2.2f;
-    const float approachLength = 12.6f; // Spawn to stop line dist
+    const float approachLength = 12.6f;
     int cap_per_lane = std::max(1, int(approachLength / minGap));
-    laneCapacity = cap_per_lane * 2; // Both ways
 
-    int ns_count = 0; // North/South cars
-    int ew_count = 0; // East/West cars
+    int ns_count = 0;
+    int ew_count = 0;
 
     for (int i = 0; i < MAX_CARS; ++i)
     {
@@ -817,24 +719,20 @@ void computeOccupancy()
         }
     }
 
-    // 2 lanes per axis
     occupancyNS = float(ns_count) / float(cap_per_lane * 2);
     occupancyEW = float(ew_count) / float(cap_per_lane * 2);
 
     if (occupancyNS > 1.0f) occupancyNS = 1.0f;
     if (occupancyEW > 1.0f) occupancyEW = 1.0f;
 
-    // Fail on full approach
     if ((occupancyNS >= 1.0f || occupancyEW >= 1.0f) && !gameOver)
     {
         gameOver = true;
         gameOverTime = glutGet(GLUT_ELAPSED_TIME);
-        // Freeze the timer
         gameOverElapsedMs = gameOverTime - simulationStartTime;
         if (gameOverElapsedMs < 0) gameOverElapsedMs = 0;
     }
 }
-
 
 void drawText2D(int x, int y, const char* text)
 {
@@ -847,7 +745,6 @@ void drawHUD()
 {
     computeOccupancy();
 
-    // Ortho for HUD
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
     glLoadIdentity();
@@ -859,7 +756,6 @@ void drawHUD()
 
     glDisable(GL_DEPTH_TEST);
 
-    // NS/EW occupancy — two centered yellow lines at bottom
     {
         char nsb[32], ewb[32];
         sprintf(nsb, "NS: %.0f%%", occupancyNS * 100.0f);
@@ -871,7 +767,6 @@ void drawHUD()
         drawText2D((windowWidth - ew) / 2, 26, ewb);
     }
 
-    // Controls - centered at top
     {
         const char* ctrl = "R=restart  Space=toggle lights  Esc=quit";
         int ctrlW = glutBitmapLength(GLUT_BITMAP_HELVETICA_18, (const unsigned char*)ctrl);
@@ -879,7 +774,6 @@ void drawHUD()
         drawText2D(ctrlX, windowHeight - 24, ctrl);
     }
 
-    // Timer — centered, black, just below controls (frozen at game over)
     {
         int displayMs = gameOver ? gameOverElapsedMs
                                  : (glutGet(GLUT_ELAPSED_TIME) - simulationStartTime);
@@ -894,8 +788,6 @@ void drawHUD()
         glColor3f(0.0f, 0.0f, 0.0f);
         drawText2D(tx, windowHeight - 46, timeBuf);
     }
-
-    // Dim overlay on game over
 
     if (gameOver)
     {
@@ -923,7 +815,6 @@ void drawHUD()
         int gy = h / 2 + 24;
         drawText2D(gx, gy, go);
 
-        // Survival time
         {
             int ts = gameOverElapsedMs / 1000;
             char survBuf[48];
@@ -938,7 +829,6 @@ void drawHUD()
         int hx = w / 2 - (int)(7 * strlen(hint));
         drawText2D(hx, gy - 56, hint);
 
-        // Auto-restart countdown
         if (gameOverTime > 0)
         {
             int elapsedMs = glutGet(GLUT_ELAPSED_TIME) - gameOverTime;
@@ -958,8 +848,6 @@ void drawHUD()
     glPopMatrix();
     glMatrixMode(GL_MODELVIEW);
 }
-
-// End congestion tracking
 
 void drawRoad()
 {
@@ -1105,12 +993,9 @@ void drawTrafficLight(float x, float z, float rotationY, bool verticalFacingGree
 
     bool greenActive = (northSouthGreen == verticalFacingGreen);
 
-    // Dim inactive lights
     float redActiveR = 0.95f, redActiveG = 0.05f, redActiveB = 0.05f;
     float redDimR = 0.25f, redDimG = 0.05f, redDimB = 0.05f;
-
     float yellowR = 0.9f, yellowG = 0.8f, yellowB = 0.1f;
-
     float greenActiveR = 0.05f, greenActiveG = 0.95f, greenActiveB = 0.05f;
     float greenDimR = 0.05f, greenDimG = 0.25f, greenDimB = 0.05f;
 
@@ -1137,7 +1022,6 @@ void drawTrafficLights()
     drawTrafficLight( 5.9f,  5.9f, -90.0f, false);
 }
 
-// Draw a single wheel (small dark cube)
 void drawWheel(float ox, float oy, float oz)
 {
     glColor3f(0.05f, 0.05f, 0.05f);
@@ -1149,21 +1033,18 @@ void drawWheel(float ox, float oy, float oz)
 
 void drawCar_Shape(const Car& car)
 {
-    // Body - purple
     glColor3f(car.r, car.g, car.b);
     glPushMatrix();
     glTranslatef(0.0f, 0.22f, 0.0f);
     drawBox(1.0f, 0.4f, 2.0f);
     glPopMatrix();
 
-    // Cabin (slightly darker)
     glColor3f(std::max(0.0f, car.r - 0.18f), std::max(0.0f, car.g - 0.05f), std::max(0.0f, car.b - 0.18f));
     glPushMatrix();
     glTranslatef(0.0f, 0.57f, -0.05f);
     drawBox(0.78f, 0.30f, 1.0f);
     glPopMatrix();
 
-    // 4 wheels - black
     drawWheel(-0.40f, -0.04f,  0.65f);
     drawWheel( 0.40f, -0.04f,  0.65f);
     drawWheel(-0.40f, -0.04f, -0.65f);
@@ -1172,28 +1053,24 @@ void drawCar_Shape(const Car& car)
 
 void drawBus_Shape(const Car& car)
 {
-    // Long tall rectangular body - blue
     glColor3f(car.r, car.g, car.b);
     glPushMatrix();
     glTranslatef(0.0f, 0.50f, 0.0f);
     drawBox(1.1f, 0.9f, 2.8f);
     glPopMatrix();
 
-    // Roof stripe (slightly lighter)
     glColor3f(std::min(1.0f, car.r + 0.20f), std::min(1.0f, car.g + 0.20f), std::min(1.0f, car.b + 0.20f));
     glPushMatrix();
     glTranslatef(0.0f, 0.97f, 0.0f);
     drawBox(1.12f, 0.08f, 2.82f);
     glPopMatrix();
 
-    // Windows strip (light blue-grey)
     glColor3f(0.60f, 0.80f, 0.95f);
     glPushMatrix();
     glTranslatef(0.0f, 0.58f, 0.0f);
     drawBox(1.12f, 0.28f, 2.6f);
     glPopMatrix();
 
-    // 6 wheels (dual rear)
     drawWheel(-0.46f, -0.04f,  1.00f);
     drawWheel( 0.46f, -0.04f,  1.00f);
     drawWheel(-0.46f, -0.04f,  0.00f);
@@ -1204,56 +1081,48 @@ void drawBus_Shape(const Car& car)
 
 void drawBike_Shape(const Car& car)
 {
-    // Narrow body - red
     glColor3f(car.r, car.g, car.b);
     glPushMatrix();
     glTranslatef(0.0f, 0.28f, 0.0f);
     drawBox(0.45f, 0.28f, 1.4f);
     glPopMatrix();
 
-    // Fuel tank / upper body hump
     glColor3f(std::max(0.0f, car.r - 0.15f), std::max(0.0f, car.g), std::max(0.0f, car.b));
     glPushMatrix();
     glTranslatef(0.0f, 0.52f, 0.10f);
     drawBox(0.36f, 0.20f, 0.70f);
     glPopMatrix();
 
-    // Handlebars
     glColor3f(0.55f, 0.55f, 0.55f);
     glPushMatrix();
     glTranslatef(0.0f, 0.62f, 0.60f);
     drawBox(0.55f, 0.06f, 0.10f);
     glPopMatrix();
 
-    // 2 wheels (thinner)
     drawWheel(0.0f, -0.04f,  0.58f);
     drawWheel(0.0f, -0.04f, -0.58f);
 }
 
 void drawTruck_Shape(const Car& car)
 {
-    // Long cargo body - dark yellow
     glColor3f(car.r, car.g, car.b);
     glPushMatrix();
     glTranslatef(0.0f, 0.45f, 0.40f);
     drawBox(1.2f, 0.8f, 2.2f);
     glPopMatrix();
 
-    // Cab (front, shorter & taller)
     glColor3f(std::max(0.0f, car.r - 0.12f), std::max(0.0f, car.g - 0.10f), std::max(0.0f, car.b));
     glPushMatrix();
     glTranslatef(0.0f, 0.55f, -1.10f);
     drawBox(1.1f, 1.0f, 0.85f);
     glPopMatrix();
 
-    // Exhaust stack
     glColor3f(0.4f, 0.4f, 0.4f);
     glPushMatrix();
     glTranslatef(0.40f, 1.22f, -1.0f);
     drawBox(0.08f, 0.5f, 0.08f);
     glPopMatrix();
 
-    // 6 wheels (dual rear axle)
     drawWheel(-0.52f, -0.04f,  1.10f);
     drawWheel( 0.52f, -0.04f,  1.10f);
     drawWheel(-0.52f, -0.04f,  0.20f);
@@ -1301,7 +1170,6 @@ void drawPerson(const Person& p)
     glPushMatrix();
     glTranslatef(p.x, 0.02f + bobY, p.z);
 
-    // Face direction of travel
     float rotY = 0.0f;
     if (p.sidewalk == 0 || p.sidewalk == 1)
         rotY = (p.dir > 0) ? 0.0f : 180.0f;
@@ -1310,7 +1178,6 @@ void drawPerson(const Person& p)
     glRotatef(rotY, 0.0f, 1.0f, 0.0f);
     glScalef(1.0f, p.heightScale, 1.0f);
 
-    // -- Left leg (hip pivot at y=0.40) --
     glColor3f(p.pantsR, p.pantsG, p.pantsB);
     glPushMatrix();
         glTranslatef(-0.07f, 0.40f, 0.0f);
@@ -1318,7 +1185,7 @@ void drawPerson(const Person& p)
         glTranslatef(0.0f, -0.20f, 0.0f);
         drawBox(0.09f, 0.40f, 0.09f);
     glPopMatrix();
-    // -- Right leg --
+
     glPushMatrix();
         glTranslatef(0.07f, 0.40f, 0.0f);
         glRotatef(-legA, 1.0f, 0.0f, 0.0f);
@@ -1326,21 +1193,19 @@ void drawPerson(const Person& p)
         drawBox(0.09f, 0.40f, 0.09f);
     glPopMatrix();
 
-    // -- Torso --
     glColor3f(p.shirtR, p.shirtG, p.shirtB);
     glPushMatrix();
         glTranslatef(0.0f, 0.60f, 0.0f);
         drawBox(0.24f, 0.36f, 0.13f);
     glPopMatrix();
 
-    // -- Left arm (shoulder pivot at y=0.74) --
     glPushMatrix();
         glTranslatef(-0.16f, 0.74f, 0.0f);
         glRotatef(armA, 1.0f, 0.0f, 0.0f);
         glTranslatef(0.0f, -0.12f, 0.0f);
         drawBox(0.07f, 0.24f, 0.07f);
     glPopMatrix();
-    // -- Right arm --
+
     glPushMatrix();
         glTranslatef(0.16f, 0.74f, 0.0f);
         glRotatef(-armA, 1.0f, 0.0f, 0.0f);
@@ -1348,7 +1213,6 @@ void drawPerson(const Person& p)
         drawBox(0.07f, 0.24f, 0.07f);
     glPopMatrix();
 
-    // -- Head --
     glColor3f(p.skinR, p.skinG, p.skinB);
     glPushMatrix();
         glTranslatef(0.0f, 0.92f, 0.0f);
@@ -1390,7 +1254,6 @@ void display()
     }
 
     drawPeople();
-
     drawHUD();
 
     glutSwapBuffers();
@@ -1472,28 +1335,25 @@ void resetSimulation()
     gameOverTime = 0;
     occupancyNS = occupancyEW = 0.0f;
     simulationStartTime = glutGet(GLUT_ELAPSED_TIME);
-    gameOverElapsedMs   = 0;
-    speedMultiplier     = 1.0f;
-    lastSpeedTick       = 0;
-    // Re-init people so they respawn at starting positions
+    gameOverElapsedMs = 0;
+    speedMultiplier = 1.0f;
+    lastSpeedTick = 0;
     peopleInit = false;
     initPeople();
 }
 
-void keyboard(unsigned char key, int x, int y)
+void keyboard(unsigned char key, int, int)
 {
     if (key == 'r' || key == 'R')
     {
         resetSimulation();
     }
-    else if (key == ' ') // Spacebar
+    else if (key == ' ')
     {
-        // Toggle traffic lights
         northSouthGreen = !northSouthGreen;
     }
-    else if (key == 27) // ESC
+    else if (key == 27)
     {
         std::exit(0);
     }
 }
-
